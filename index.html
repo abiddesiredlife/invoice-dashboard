@@ -147,12 +147,12 @@
     <div class="card-container" id="kpi-cards"></div>
     <div class="file-properties" id="file-properties">
         <h3>File Properties</h3>
-        <p><strong>Filename:</strong> invoice_data.csv</p>
+        <p><strong>Filename:</strong> current olive alivira os.xlsx - ALIVIRA.csv</p>
         <p><strong>Size:</strong> 12 KB</p>
-        <p><strong>Location:</strong> Google Sheets (Public URL)</p>
+        <p><strong>Location:</strong> GitHub Repository</p>
         <p><strong>Created:</strong> 2025-01-01 10:00 AM IST</p>
         <p><strong>Modified:</strong> 2025-07-09 06:00 PM IST</p>
-        <p><strong>Accessed:</strong> 2025-07-09 07:52 PM IST</p>
+        <p><strong>Accessed:</strong> 2025-07-09 08:03 PM IST</p>
         <p><strong>Status:</strong> Active</p>
     </div>
     <canvas id="days-chart"></canvas>
@@ -174,18 +174,14 @@
     </table>
 
     <script>
-        const url = "https://cors-anywhere.herokuapp.com/https://docs.google.com/spreadsheets/d/e/2PACX-1vSrtlUIgWw1mxcwNTm_e_YkfW_cr0tmPM4o0S2wHdLQ3Gv4NgfPOwp_kv1pTAIZ1Q/pub?output=csv";
+        const url = "https://raw.githubusercontent.com/abiddesiredlife/invoice-dashboard/refs/heads/main/current%20olive%20alivira%20os.xlsx%20-%20ALIVIRA.csv";
         let data = [];
         let chartInstance = null;
 
-        // Fetch CSV with CORS proxy
+        // Fetch CSV
         async function fetchData() {
             try {
-                const response = await fetch(url, {
-                    headers: {
-                        'Origin': 'https://your-username.github.io' // Replace with your GitHub Pages URL
-                    }
-                });
+                const response = await fetch(url);
                 if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                 const text = await response.text();
                 const rows = text.split('\n').map(row => row.split(',').map(cell => cell.trim()));
@@ -209,7 +205,7 @@
             } catch (error) {
                 console.error('Error fetching data:', error);
                 document.getElementById('error-message').style.display = 'block';
-                document.getElementById('error-message').innerText = `Failed to load data: ${error.message}. Check the console for details or ensure the CORS proxy is active[](https://cors-anywhere.herokuapp.com/).`;
+                document.getElementById('error-message').innerText = `Failed to load data: ${error.message}. Check the console for details or ensure the CSV is uploaded to GitHub.`;
             }
         }
 
