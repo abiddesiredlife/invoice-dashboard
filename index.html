@@ -169,21 +169,28 @@
                     let obj = {};
                     headers.forEach((header, i) => {
                         const normalizedHeader = header.replace(/\s+/g, ' ').trim().toLowerCase();
-                        const value = row[i] !== undefined ? row[i].trim() : '';
+                        const value = row[i] !== undefined ? row[i].trim() : 'N/A';
                         obj[normalizedHeader === 'name of the customer' ? 'Name of the Customer' : 
                             normalizedHeader === 'place' ? 'Place' : 
                             normalizedHeader === 'inv. no.' ? 'Inv. No.' : 
                             normalizedHeader === 'inv. date' ? 'Inv. Date' : 
-                            normalizedHeader === 's.no.' ? 'S.No.' : normalizedHeader] = value || 'N/A';
+                            normalizedHeader === 's.no.' ? 'S.No.' : 
+                            normalizedHeader === 'invoice value' ? 'Invoice Value' : 
+                            normalizedHeader === 'amount pending' ? 'Amount Pending' : 
+                            normalizedHeader === 'days of invoice' ? 'DAYS OF INVOICE' : 
+                            normalizedHeader] = value;
                     });
-                    obj['DAYS OF INVOICE'] = parseFloat(obj['DAYS OF INVOICE']) || 0;
-                    obj['Invoice Value'] = parseFloat(obj['Invoice Value'].replace(/[^0-9.-]+/g, '') || 0); // Remove non-numeric chars
-                    obj['Amount Pending'] = parseFloat(obj['Amount Pending'].replace(/[^0-9.-]+/g, '') || 0); // Remove non-numeric chars
+                    // Enhanced parsing for currency
+                    obj['DAYS OF INVOICE'] = parseFloat(obj['DAYS OF INVOICE'].replace(/[^0-9.-]+/g, '') || 0);
+                    obj['Invoice Value'] = parseFloat(obj['Invoice Value'].replace(/[^\d.-]+/g, '')) || parseFloat(obj['Invoice Value'].replace(/[₹Rs$₹,]/g, '').replace(/\s/g, '')) || 0;
+                    obj['Amount Pending'] = parseFloat(obj['Amount Pending'].replace(/[^\d.-]+/g, '')) || parseFloat(obj['Amount Pending'].replace(/[₹Rs$₹,]/g, '').replace(/\s/g, '')) || 0;
                     return obj;
                 });
-                console.log('Data loaded:', data); // Debug: Check data
+                console.log('Raw headers:', rows[0]); // Debug: Check raw headers
+                console.log('Parsed data:', data); // Debug: Check parsed data
                 console.log('Customer names:', [...new Set(data.map(row => row['Name of the Customer']))].filter(name => name && name.trim() !== '')); // Debug: Check customer names
                 console.log('Places:', [...new Set(data.map(row => row['Place']))].filter(place => place && place.trim() !== '')); // Debug: Check places
+                console.log('Invoice Value values:', data.map(row => row['Invoice Value'])); // Debug: Check invoice values
                 console.log('Amount Pending values:', data.map(row => row['Amount Pending'])); // Debug: Check amounts
                 document.getElementById('error-message').style.display = 'none';
                 updateDashboard();
