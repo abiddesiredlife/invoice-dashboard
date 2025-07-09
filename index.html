@@ -67,6 +67,7 @@
             width: 18%;
             min-width: 150px;
             text-align: center;
+            word-wrap: break-word; /* Prevent block overflow */
         }
         .card h3 {
             margin: 0 0 10px;
@@ -76,16 +77,7 @@
             margin: 0;
             font-size: 24px;
             font-weight: bold;
-        }
-        .file-properties {
-            margin: 20px 0;
-            background-color: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 20px;
-            max-width: 80%;
-            margin-left: auto;
-            margin-right: auto;
+            overflow: hidden; /* Handle overflow if numbers are too large */
         }
         table {
             border-collapse: collapse;
@@ -102,7 +94,7 @@
             background-color: #f2f2f2;
         }
         tr[days-of-invoice="90+"] {
-            background-color: #8B0000 !important; /* Dark red for 90+ days, !important to override */
+            background-color: #8B0000 !important; /* Dark red for 90+ days */
             color: white !important;
         }
         canvas {
@@ -120,9 +112,6 @@
             }
             #search-input, #autocomplete-list {
                 width: 80%;
-            }
-            .file-properties {
-                max-width: 95%;
             }
             table, canvas {
                 width: 95%;
@@ -145,16 +134,6 @@
         <div id="autocomplete-list"></div>
     </div>
     <div class="card-container" id="kpi-cards"></div>
-    <div class="file-properties" id="file-properties">
-        <h3>File Properties</h3>
-        <p><strong>Filename:</strong> current olive alivira os.xlsx - ALIVIRA.csv</p>
-        <p><strong>Size:</strong> 12 KB</p>
-        <p><strong>Location:</strong> GitHub Repository</p>
-        <p><strong>Created:</strong> 2025-01-01 10:00 AM IST</p>
-        <p><strong>Modified:</strong> 2025-07-09 06:00 PM IST</p>
-        <p><strong>Accessed:</strong> 2025-07-09 08:08 PM IST</p>
-        <p><strong>Status:</strong> Active</p>
-    </div>
     <canvas id="days-chart"></canvas>
     <table id="data-table">
         <thead>
@@ -189,21 +168,23 @@
                 data = rows.slice(1).map(row => {
                     let obj = {};
                     headers.forEach((header, i) => {
-                        // Handle case mismatch or extra spaces
                         const normalizedHeader = header.replace(/\s+/g, ' ').trim().toLowerCase();
                         const value = row[i] !== undefined ? row[i].trim() : '';
                         obj[normalizedHeader === 'name of the customer' ? 'Name of the Customer' : 
                             normalizedHeader === 'place' ? 'Place' : 
-                            normalizedHeader] = value;
+                            normalizedHeader === 'inv. no.' ? 'Inv. No.' : 
+                            normalizedHeader === 'inv. date' ? 'Inv. Date' : 
+                            normalizedHeader === 's.no.' ? 'S.No.' : normalizedHeader] = value || 'N/A';
                     });
                     obj['DAYS OF INVOICE'] = parseFloat(obj['DAYS OF INVOICE']) || 0;
-                    obj['Invoice Value'] = parseFloat(obj['Invoice Value']) || 0;
-                    obj['Amount Pending'] = parseFloat(obj['Amount Pending']) || 0;
+                    obj['Invoice Value'] = parseFloat(obj['Invoice Value'].replace(/[^0-9.-]+/g, '') || 0); // Remove non-numeric chars
+                    obj['Amount Pending'] = parseFloat(obj['Amount Pending'].replace(/[^0-9.-]+/g, '') || 0); // Remove non-numeric chars
                     return obj;
                 });
                 console.log('Data loaded:', data); // Debug: Check data
                 console.log('Customer names:', [...new Set(data.map(row => row['Name of the Customer']))].filter(name => name && name.trim() !== '')); // Debug: Check customer names
                 console.log('Places:', [...new Set(data.map(row => row['Place']))].filter(place => place && place.trim() !== '')); // Debug: Check places
+                console.log('Amount Pending values:', data.map(row => row['Amount Pending'])); // Debug: Check amounts
                 document.getElementById('error-message').style.display = 'none';
                 updateDashboard();
                 populateAutocomplete('Name of the Customer');
@@ -288,15 +269,15 @@
             filteredData.slice(0, 10).forEach(row => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${row['S.No.'] || ''}</td>
-                    <td>${row['Name of the Customer'] || ''}</td>
-                    <td>${row['Place'] || ''}</td>
-                    <td>${row['Inv. No.'] || ''}</td>
-                    <td>${row['Inv. Date'] || ''}</td>
+                    <td>${row['S.No.'] || 'N/A'}</td>
+                    <td>${row['Name of the Customer'] || 'N/A'}</td>
+                    <td>${row['Place'] || 'N/A'}</td>
+                    <td>${row['Inv. No.'] || 'N/A'}</td>
+                    <td>${row['Inv. Date'] || 'N/A'}</td>
                     <td>${row['DAYS OF INVOICE']}</td>
                     <td>Rs ${row['Invoice Value'].toFixed(2)}</td>
                     <td>Rs ${row['Amount Pending'].toFixed(2)}</td>
-                    <td>${row['STATUS'] || ''}</td>
+                    <td>${row['STATUS'] || 'N/A'}</td>
                 `;
                 if (parseFloat(row['DAYS OF INVOICE']) >= 90) {
                     tr.setAttribute('days-of-invoice', '90+');
