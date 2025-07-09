@@ -102,8 +102,8 @@
             background-color: #f2f2f2;
         }
         tr[days-of-invoice="90+"] {
-            background-color: #8B0000; /* Dark red for 90+ days */
-            color: white;
+            background-color: #8B0000 !important; /* Dark red for 90+ days, !important to override */
+            color: white !important;
         }
         canvas {
             max-width: 80%;
@@ -152,7 +152,7 @@
         <p><strong>Location:</strong> GitHub Repository</p>
         <p><strong>Created:</strong> 2025-01-01 10:00 AM IST</p>
         <p><strong>Modified:</strong> 2025-07-09 06:00 PM IST</p>
-        <p><strong>Accessed:</strong> 2025-07-09 08:03 PM IST</p>
+        <p><strong>Accessed:</strong> 2025-07-09 08:08 PM IST</p>
         <p><strong>Status:</strong> Active</p>
     </div>
     <canvas id="days-chart"></canvas>
@@ -185,11 +185,16 @@
                 if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                 const text = await response.text();
                 const rows = text.split('\n').map(row => row.split(',').map(cell => cell.trim()));
-                const headers = rows[0].map(header => header.trim());
+                const headers = rows[0].map(header => header.trim().toLowerCase()); // Case-insensitive headers
                 data = rows.slice(1).map(row => {
                     let obj = {};
                     headers.forEach((header, i) => {
-                        obj[header] = row[i] !== undefined ? row[i] : ''; // Handle undefined values
+                        // Handle case mismatch or extra spaces
+                        const normalizedHeader = header.replace(/\s+/g, ' ').trim().toLowerCase();
+                        const value = row[i] !== undefined ? row[i].trim() : '';
+                        obj[normalizedHeader === 'name of the customer' ? 'Name of the Customer' : 
+                            normalizedHeader === 'place' ? 'Place' : 
+                            normalizedHeader] = value;
                     });
                     obj['DAYS OF INVOICE'] = parseFloat(obj['DAYS OF INVOICE']) || 0;
                     obj['Invoice Value'] = parseFloat(obj['Invoice Value']) || 0;
@@ -197,8 +202,8 @@
                     return obj;
                 });
                 console.log('Data loaded:', data); // Debug: Check data
-                console.log('Customer names:', [...new Set(data.map(row => row['Name of the Customer']))].filter(name => name)); // Debug: Check customer names
-                console.log('Places:', [...new Set(data.map(row => row['Place']))].filter(place => place)); // Debug: Check places
+                console.log('Customer names:', [...new Set(data.map(row => row['Name of the Customer']))].filter(name => name && name.trim() !== '')); // Debug: Check customer names
+                console.log('Places:', [...new Set(data.map(row => row['Place']))].filter(place => place && place.trim() !== '')); // Debug: Check places
                 document.getElementById('error-message').style.display = 'none';
                 updateDashboard();
                 populateAutocomplete('Name of the Customer');
