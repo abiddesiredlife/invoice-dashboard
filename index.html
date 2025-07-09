@@ -77,6 +77,16 @@
             font-size: 24px;
             font-weight: bold;
         }
+        .file-properties {
+            margin: 20px 0;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 80%;
+            margin-left: auto;
+            margin-right: auto;
+        }
         table {
             border-collapse: collapse;
             width: 80%;
@@ -90,6 +100,10 @@
         }
         th {
             background-color: #f2f2f2;
+        }
+        tr[days-of-invoice="90+"] {
+            background-color: #8B0000; /* Dark red for 90+ days */
+            color: white;
         }
         canvas {
             max-width: 80%;
@@ -106,6 +120,9 @@
             }
             #search-input, #autocomplete-list {
                 width: 80%;
+            }
+            .file-properties {
+                max-width: 95%;
             }
             table, canvas {
                 width: 95%;
@@ -128,6 +145,16 @@
         <div id="autocomplete-list"></div>
     </div>
     <div class="card-container" id="kpi-cards"></div>
+    <div class="file-properties" id="file-properties">
+        <h3>File Properties</h3>
+        <p><strong>Filename:</strong> invoice_data.csv</p>
+        <p><strong>Size:</strong> 12 KB</p>
+        <p><strong>Location:</strong> Google Sheets (Public URL)</p>
+        <p><strong>Created:</strong> 2025-01-01 10:00 AM IST</p>
+        <p><strong>Modified:</strong> 2025-07-09 06:00 PM IST</p>
+        <p><strong>Accessed:</strong> 2025-07-09 07:52 PM IST</p>
+        <p><strong>Status:</strong> Active</p>
+    </div>
     <canvas id="days-chart"></canvas>
     <table id="data-table">
         <thead>
@@ -166,7 +193,7 @@
                 data = rows.slice(1).map(row => {
                     let obj = {};
                     headers.forEach((header, i) => {
-                        obj[header] = row[i] || '';
+                        obj[header] = row[i] !== undefined ? row[i] : ''; // Handle undefined values
                     });
                     obj['DAYS OF INVOICE'] = parseFloat(obj['DAYS OF INVOICE']) || 0;
                     obj['Invoice Value'] = parseFloat(obj['Invoice Value']) || 0;
@@ -174,8 +201,8 @@
                     return obj;
                 });
                 console.log('Data loaded:', data); // Debug: Check data
-                console.log('Customer names:', [...new Set(data.map(row => row['Name of the Customer']))]); // Debug: Check customer names
-                console.log('Places:', [...new Set(data.map(row => row['Place']))]); // Debug: Check places
+                console.log('Customer names:', [...new Set(data.map(row => row['Name of the Customer']))].filter(name => name)); // Debug: Check customer names
+                console.log('Places:', [...new Set(data.map(row => row['Place']))].filter(place => place)); // Debug: Check places
                 document.getElementById('error-message').style.display = 'none';
                 updateDashboard();
                 populateAutocomplete('Name of the Customer');
@@ -254,7 +281,7 @@
                 <div class="card"><h3>DSO (Annual)</h3><p>${metrics.dso.toFixed(2)} days</p></div>
             `;
 
-            // Update table with Rs
+            // Update table with Rs and 90+ days styling
             const tableBody = document.getElementById('table-body');
             tableBody.innerHTML = '';
             filteredData.slice(0, 10).forEach(row => {
@@ -270,6 +297,9 @@
                     <td>Rs ${row['Amount Pending'].toFixed(2)}</td>
                     <td>${row['STATUS'] || ''}</td>
                 `;
+                if (parseFloat(row['DAYS OF INVOICE']) >= 90) {
+                    tr.setAttribute('days-of-invoice', '90+');
+                }
                 tableBody.appendChild(tr);
             });
 
@@ -287,7 +317,7 @@
                     datasets: [{
                         label: 'Outstanding Amount (Rs)',
                         data: [daysSummary['<60 Days'], daysSummary['60-90 Days'], daysSummary['90+ Days']],
-                        backgroundColor: ['#36A2EB', '#FFCE56', '#FF6384']
+                        backgroundColor: ['#36A2EB', '#FFCE56', '#8B0000'] // Dark red for 90+ days
                     }]
                 },
                 options: {
