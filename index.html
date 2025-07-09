@@ -153,18 +153,18 @@
     </table>
 
     <script>
-        const url = "https://raw.githubusercontent.com/abiddesiredlife/invoice-dashboard/refs/heads/main/current%20olive%20alivira%20os.xlsx%20-%20ALIVIRA.csv";
+        const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrtlUIgWw1mxcwNTm_e_YkfW_cr0tmPM4o0S2wHdLQ3Gv4NgfPOwp_kv1pTAIZ1Q/pub?output=csv"; // Your published CSV URL
         let data = [];
         let chartInstance = null;
 
-        // Fetch CSV
+        // Fetch CSV from Google Sheet
         async function fetchData() {
             try {
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                 const text = await response.text();
                 const rows = text.split('\n').map(row => row.split(',').map(cell => cell.trim()));
-                const headers = rows[0].map(header => header.trim().toLowerCase()); // Case-insensitive headers
+                const headers = rows[0].map(header => header.trim().toLowerCase());
                 data = rows.slice(1).map(row => {
                     let obj = {};
                     headers.forEach((header, i) => {
@@ -180,7 +180,6 @@
                             normalizedHeader === 'days of invoice' ? 'DAYS OF INVOICE' : 
                             normalizedHeader] = value;
                     });
-                    // Enhanced parsing for Indian Rupee and large number formats
                     obj['DAYS OF INVOICE'] = parseFloat(obj['DAYS OF INVOICE'].replace(/[^0-9.-]+/g, '') || 0);
                     obj['Invoice Value'] = parseFloat(obj['Invoice Value'].replace(/[₹Rs$,]/g, '').replace(/,/g, '').replace(/\s/g, '') || 0) || 
                                           parseFloat(obj['Invoice Value'].replace(/[^\d,.]+/g, '').replace(/,/g, '')) || 0;
@@ -188,19 +187,13 @@
                                            parseFloat(obj['Amount Pending'].replace(/[^\d,.]+/g, '').replace(/,/g, '')) || 0;
                     return obj;
                 });
-                console.log('Raw headers:', rows[0]); // Debug: Check raw headers
-                console.log('Parsed data:', data); // Debug: Check parsed data
-                console.log('Customer names:', [...new Set(data.map(row => row['Name of the Customer']))].filter(name => name && name.trim() !== '')); // Debug: Check customer names
-                console.log('Places:', [...new Set(data.map(row => row['Place']))].filter(place => place && place.trim() !== '')); // Debug: Check places
-                console.log('Invoice Value values:', data.map(row => row['Invoice Value'])); // Debug: Check invoice values
-                console.log('Amount Pending values:', data.map(row => row['Amount Pending'])); // Debug: Check amounts
-                document.getElementById('error-message').style.display = 'none';
+                console.log('Parsed data:', data);
                 updateDashboard();
                 populateAutocomplete('Name of the Customer');
             } catch (error) {
                 console.error('Error fetching data:', error);
                 document.getElementById('error-message').style.display = 'block';
-                document.getElementById('error-message').innerText = `Failed to load data: ${error.message}. Check the console for details or ensure the CSV is uploaded to GitHub.`;
+                document.getElementById('error-message').innerText = 'Error loading data: ' + error.message;
             }
         }
 
@@ -212,7 +205,7 @@
             const uniqueValues = [...new Set(data.map(row => row[searchType]))]
                 .filter(val => val && val.trim() !== '')
                 .sort();
-            console.log(`Autocomplete values for ${searchType}:`, uniqueValues); // Debug: Check values
+            console.log(`Autocomplete values for ${searchType}:`, uniqueValues);
             if (uniqueValues.length === 0) {
                 document.getElementById('error-message').style.display = 'block';
                 document.getElementById('error-message').innerText = `No valid ${searchType} values found in the data.`;
@@ -305,7 +298,7 @@
                     datasets: [{
                         label: 'Outstanding Amount (Rs)',
                         data: [daysSummary['<60 Days'], daysSummary['60-90 Days'], daysSummary['90+ Days']],
-                        backgroundColor: ['#36A2EB', '#FFCE56', '#8B0000'] // Dark red for 90+ days in chart
+                        backgroundColor: ['#36A2EB', '#FFCE56', '#8B0000']
                     }]
                 },
                 options: {
@@ -325,11 +318,9 @@
         });
         document.getElementById('search-input').addEventListener('input', updateDashboard);
 
-        // Initial fetch
+        // Initial fetch and periodic refresh
         fetchData();
-
-        // Periodic refresh (every 60 seconds)
-        setInterval(fetchData, 60000);
+        setInterval(fetchData, 60000); // Refresh every 60 seconds
     </script>
 </body>
 </html>
