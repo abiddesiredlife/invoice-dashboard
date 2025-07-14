@@ -1,243 +1,449 @@
-<script>
-    const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrtlUIgWw1mxcwNTm_e_YkfW_cr0tmPM4o0S2wHdLQ3Gv4NgfPOwp_kv1pTAIZ1Q/pub?output=csv";
-    let data = [];
-    let chartInstance = null;
-    let currentUser = null;
-
-    // Simple hash function for passwords
-    function hashPassword(password) {
-        let hash = 0;
-        for (let i = 0; i < password.length; i++) {
-            hash = (hash << 5) - hash + password.charCodeAt(i);
-            hash |= 0;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Olive OS Invoice Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f9;
+            text-align: center;
         }
-        return hash.toString();
-    }
-
-    // Initialize or update users based on data
-    function initializeUsers() {
-        let storedUsers = JSON.parse(localStorage.getItem("users") || "{}");
-        const defaultPassword = hashPassword("12345678");
-        const adminUser = "ESHAK";
-        if (!storedUsers[adminUser]) storedUsers[adminUser] = defaultPassword;
-
-        // Extract unique regions from data
-        const uniqueRegions = [...new Set(data.map(row => row['Place']?.trim()))].filter(region => region && region !== "N/A");
-        uniqueRegions.forEach(region => {
-            if (!storedUsers[region]) storedUsers[region] = defaultPassword;
-        });
-        localStorage.setItem("users", JSON.stringify(storedUsers));
-        updatePasswordDropdown(storedUsers);
-    }
-
-    function updatePasswordDropdown(users) {
-        const select = document.getElementById("change-user");
-        select.innerHTML = '<option value="ESHAK">ESHAK (Admin)</option>';
-        Object.keys(users).forEach(user => {
-            if (user !== "ESHAK") {
-                select.innerHTML += `<option value="${user}">${user}</option>`;
+        h1 {
+            color: #333;
+        }
+        .login-container {
+            display: none;
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .login-container.active {
+            display: block;
+        }
+        .login-container input, .login-container button {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            padding: 10px;
+            font-size: 16px;
+        }
+        .dashboard-container {
+            display: none;
+        }
+        .dashboard-container.active {
+            display: block;
+        }
+        .search-container {
+            margin: 20px 0;
+            position: relative;
+        }
+        .search-container label {
+            font-size: 18px;
+            margin-right: 10px;
+        }
+        .search-container input[type="radio"] {
+            margin: 0 5px;
+        }
+        #search-input {
+            width: 50%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        #autocomplete-list {
+            position: absolute;
+            width: 50%;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            z-index: 1000;
+            display: none;
+        }
+        #autocomplete-list div {
+            padding: 10px;
+            cursor: pointer;
+        }
+        #autocomplete-list div:hover {
+            background-color: #f0f0f0;
+        }
+        .card-container {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .card {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin: 10px;
+            width: 18%;
+            min-width: 150px;
+            text-align: center;
+            word-wrap: break-word;
+        }
+        .card h3 {
+            margin: 0 0 10px;
+            font-size: 18px;
+        }
+        .card p {
+            margin: 0;
+            font-size: 24px;
+            font-weight: bold;
+            overflow: hidden;
+        }
+        .card[data-days="90+"] {
+            background-color: #8B0000;
+            color: white;
+        }
+        table {
+            border-collapse: collapse;
+            width: 80%;
+            margin: 20px auto;
+            background-color: white;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        canvas {
+            max-width: 80%;
+            margin: 20px auto;
+        }
+        #error-message {
+            color: red;
+            margin: 20px;
+            display: none;
+        }
+        .password-change {
+            display: none;
+            max-width: 400px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .password-change.active {
+            display: block;
+        }
+        @media (max-width: 768px) {
+            .card {
+                width: 45%;
             }
-        });
-    }
-
-    function login() {
-        const username = document.getElementById("username").value.toLowerCase(); // Case-insensitive
-        const password = document.getElementById("password").value;
-        const hashedPassword = hashPassword(password);
-        const storedUsers = JSON.parse(localStorage.getItem("users"));
-
-        // Map lowercase username to actual username
-        const actualUsername = Object.keys(storedUsers).find(user => user.toLowerCase() === username);
-        if (actualUsername && storedUsers[actualUsername] === hashedPassword) {
-            currentUser = actualUsername;
-            document.getElementById("login-container").classList.remove("active");
-            document.getElementById("dashboard-container").classList.add("active");
-            if (currentUser === "ESHAK") {
-                document.getElementById("change-password-btn").style.display = "block";
+            #search-input, #autocomplete-list {
+                width: 80%;
             }
-            fetchData();
-        } else {
-            document.getElementById("login-error").style.display = "block";
+            table, canvas {
+                width: 95%;
+            }
         }
-    }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="login-container active" id="login-container">
+        <h2>Login</h2>
+        <input type="text" id="username" placeholder="Username" required>
+        <input type="password" id="password" placeholder="Password" required>
+        <button onclick="login()">Login</button>
+        <div id="login-error" style="color: red; display: none;">Invalid username or password.</div>
+    </div>
+    <div class="dashboard-container" id="dashboard-container">
+        <h1>Olive OS Invoice Dashboard</h1>
+        <div id="error-message"></div>
+        <div class="search-container">
+            <label>Search By:</label>
+            <input type="radio" name="search-type" value="Name of the Customer" id="customer-radio" checked>
+            <label for="customer-radio">Customer</label>
+            <input type="radio" name="search-type" value="Place" id="region-radio">
+            <label for="region-radio">Region</label>
+            <br>
+            <input type="text" id="search-input" placeholder="Start typing to search...">
+            <div id="autocomplete-list"></div>
+        </div>
+        <div class="card-container" id="kpi-cards"></div>
+        <canvas id="days-chart"></canvas>
+        <table id="data-table">
+            <thead>
+                <tr>
+                    <th>S.No.</th>
+                    <th>Name of the Customer</th>
+                    <th>Place</th>
+                    <th>Inv. No.</th>
+                    <th>Inv. Date</th>
+                    <th>DAYS OF INVOICE</th>
+                    <th>Invoice Value</th>
+                    <th>Amount Pending</th>
+                    <th>PAYMENT RECIEVED DATE</th>
+                    <th>Remarks</th>
+                    <th>STATUS</th>
+                </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+        </table>
+        <button onclick="togglePasswordChange()" id="change-password-btn" style="display: none;">Change Passwords</button>
+        <button onclick="logout()">Logout</button>
+        <div class="password-change" id="password-change">
+            <h3>Change Password</h3>
+            <select id="change-user">
+                <option value="ESHAK">ESHAK (Admin)</option>
+            </select>
+            <input type="password" id="new-password" placeholder="New Password" required>
+            <button onclick="changePassword()">Save</button>
+            <div id="password-error" style="color: red; display: none;">Only admin can change passwords.</div>
+        </div>
+    </div>
 
-    function togglePasswordChange() {
-        if (currentUser === "ESHAK") {
-            document.getElementById("password-change").classList.toggle("active");
-        } else {
-            document.getElementById("password-error").style.display = "block";
-            setTimeout(() => document.getElementById("password-error").style.display = "none", 2000);
+    <script>
+        const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrtlUIgWw1mxcwNTm_e_YkfW_cr0tmPM4o0S2wHdLQ3Gv4NgfPOwp_kv1pTAIZ1Q/pub?output=csv";
+        let data = [];
+        let chartInstance = null;
+        let currentUser = null;
+
+        // Simple hash function for passwords
+        function hashPassword(password) {
+            let hash = 0;
+            for (let i = 0; i < password.length; i++) {
+                hash = (hash << 5) - hash + password.charCodeAt(i);
+                hash |= 0;
+            }
+            return hash.toString();
         }
-    }
 
-    function changePassword() {
-        if (currentUser === "ESHAK") {
-            const user = document.getElementById("change-user").value;
-            const newPassword = document.getElementById("new-password").value;
-            const hashedNewPassword = hashPassword(newPassword);
+        // Initialize or update users based on data
+        function initializeUsers() {
             let storedUsers = JSON.parse(localStorage.getItem("users") || "{}");
-            storedUsers[user] = hashedNewPassword;
+            const defaultPassword = hashPassword("12345678");
+            const adminUser = "ESHAK";
+            if (!storedUsers[adminUser]) storedUsers[adminUser] = defaultPassword;
+
+            // Extract unique regions from data
+            const uniqueRegions = [...new Set(data.map(row => row['Place']?.trim()))].filter(region => region && region !== "N/A");
+            uniqueRegions.forEach(region => {
+                if (!storedUsers[region]) storedUsers[region] = defaultPassword;
+            });
             localStorage.setItem("users", JSON.stringify(storedUsers));
             updatePasswordDropdown(storedUsers);
-            document.getElementById("password-change").classList.remove("active");
-            alert(`Password for ${user} updated successfully!`);
-        } else {
-            document.getElementById("password-error").style.display = "block";
-            setTimeout(() => document.getElementById("password-error").style.display = "none", 2000);
         }
-    }
 
-    async function fetchData() {
-        try {
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-            const text = await response.text();
-            const rows = text.split('\n').map(row => row.split(',').map(cell => cell.trim()));
-            const headers = rows[0].map(header => header.trim().toLowerCase());
-            console.log('Headers:', headers); // Debug headers
-            console.log('Raw Rows:', rows); // Debug raw data
-            data = rows.slice(1).map(row => {
-                let obj = {};
-                headers.forEach((header, i) => {
-                    const normalizedHeader = header.replace(/\s+/g, ' ').trim().toLowerCase();
-                    const value = row[i] !== undefined ? row[i].trim() : 'N/A';
-                    obj[normalizedHeader === 'name of the customer' ? 'Name of the Customer' : 
-                        normalizedHeader === 'place' ? 'Place' : 
-                        normalizedHeader === 'inv. no.' ? 'Inv. No.' : 
-                        normalizedHeader === 'inv. date' ? 'Inv. Date' : 
-                        normalizedHeader === 's.no.' ? 'S.No.' : 
-                        normalizedHeader === 'invoice value' ? 'Invoice Value' : 
-                        normalizedHeader === 'amount pending' ? 'Amount Pending' : 
-                        normalizedHeader === 'days of invoice' ? 'DAYS OF INVOICE' : 
-                        normalizedHeader] = value;
-                    // Explicitly set Place to column C (index 2) if header is mismatched
-                    if (i === 2) obj['Place'] = value; // Column C is index 2
-                });
-                console.log('Row Place:', obj['Place']); // Debug Place values
-                obj['DAYS OF INVOICE'] = parseFloat(obj['DAYS OF INVOICE'].replace(/[^0-9.-]+/g, '') || 0);
-                obj['Invoice Value'] = parseFloat(obj['Invoice Value'].replace(/[₹Rs$,]/g, '').replace(/,/g, '').replace(/\s/g, '') || 0) || 
-                                      parseFloat(obj['Invoice Value'].replace(/[^\d,.]+/g, '').replace(/,/g, '')) || 0;
-                obj['Amount Pending'] = parseFloat(obj['Amount Pending'].replace(/[₹Rs$,]/g, '').replace(/,/g, '').replace(/\s/g, '') || 0) || 
-                                       parseFloat(obj['Amount Pending'].replace(/[^\d,.]+/g, '').replace(/,/g, '')) || 0;
-                return obj;
+        function updatePasswordDropdown(users) {
+            const select = document.getElementById("change-user");
+            select.innerHTML = '<option value="ESHAK">ESHAK (Admin)</option>';
+            Object.keys(users).forEach(user => {
+                if (user !== "ESHAK") {
+                    select.innerHTML += `<option value="${user}">${user}</option>`;
+                }
             });
-            initializeUsers(); // Update users based on new regions
-            updateDashboard();
-            populateAutocomplete('Name of the Customer');
-        } catch (error) {
-            console.error('Error fetching data:', error);
-            document.getElementById('error-message').style.display = 'block';
-            document.getElementById('error-message').innerText = 'Error loading data: ' + error.message;
         }
-    }
 
-    function populateAutocomplete(searchType) {
-        const input = document.getElementById('search-input');
-        const list = document.getElementById('autocomplete-list');
-        list.innerHTML = '';
-        const uniqueValues = [...new Set(data.map(row => row[searchType]))]
-            .filter(val => val && val.trim() !== '')
-            .sort();
-        console.log(`Autocomplete values for ${searchType}:`, uniqueValues);
-        if (uniqueValues.length === 0) {
-            document.getElementById('error-message').style.display = 'block';
-            document.getElementById('error-message').innerText = `No valid ${searchType} values found in the data.`;
-        }
-        input.addEventListener('input', () => {
-            const query = input.value.toLowerCase();
-            list.innerHTML = '';
-            if (query) {
-                const matches = uniqueValues.filter(val => val.toLowerCase().includes(query));
-                matches.forEach(val => {
-                    const div = document.createElement('div');
-                    div.innerText = val;
-                    div.addEventListener('click', () => {
-                        input.value = val;
-                        list.innerHTML = '';
-                        list.style.display = 'none';
-                        updateDashboard();
-                    });
-                    list.appendChild(div);
-                });
-                list.style.display = matches.length ? 'block' : 'none';
+        function login() {
+            const username = document.getElementById("username").value.toLowerCase(); // Case-insensitive
+            const password = document.getElementById("password").value;
+            const hashedPassword = hashPassword(password);
+            const storedUsers = JSON.parse(localStorage.getItem("users"));
+
+            // Map lowercase username to actual username
+            const actualUsername = Object.keys(storedUsers).find(user => user.toLowerCase() === username);
+            if (actualUsername && storedUsers[actualUsername] === hashedPassword) {
+                currentUser = actualUsername;
+                document.getElementById("login-container").classList.remove("active");
+                document.getElementById("dashboard-container").classList.add("active");
+                if (currentUser === "ESHAK") {
+                    document.getElementById("change-password-btn").style.display = "block";
+                }
+                fetchData();
             } else {
-                list.style.display = 'none';
+                document.getElementById("login-error").style.display = "block";
             }
-        });
-    }
-
-    function computeMetrics(filteredData) {
-        const totalInvoiceValue = filteredData.reduce((sum, row) => sum + row['Invoice Value'], 0);
-        const totalOutstanding = filteredData.reduce((sum, row) => sum + row['Amount Pending'], 0);
-        const days60_90 = filteredData
-            .filter(row => row['DAYS OF INVOICE'] >= 60 && row['DAYS OF INVOICE'] < 90)
-            .reduce((sum, row) => sum + row['Amount Pending'], 0);
-        const days90Plus = filteredData
-            .filter(row => row['DAYS OF INVOICE'] >= 90)
-            .reduce((sum, row) => sum + row['Amount Pending'], 0);
-        const totalReceivables = data.reduce((sum, row) => sum + row['Amount Pending'], 0);
-        const totalCreditSales = data.reduce((sum, row) => sum + row['Invoice Value'], 0);
-        const dso = totalCreditSales > 0 ? (totalReceivables / totalCreditSales) * 365 : 0;
-        return { totalInvoiceValue, totalOutstanding, days60_90, days90Plus, dso };
-    }
-
-    function updateDashboard() {
-        let filteredData = data;
-        if (currentUser !== "ESHAK") {
-            filteredData = data.filter(row => row['Place'] === currentUser);
         }
-        const metrics = computeMetrics(filteredData);
 
-        document.getElementById('kpi-cards').innerHTML = `
-            <div class="card"><h3>Total Invoice Value</h3><p>Rs ${metrics.totalInvoiceValue.toFixed(2)}</p></div>
-            <div class="card"><h3>Total Outstanding</h3><p>Rs ${metrics.totalOutstanding.toFixed(2)}</p></div>
-            <div class="card"><h3>60-90 Days</h3><p>Rs ${metrics.days60_90.toFixed(2)}</p></div>
-            <div class="card" data-days="90+"><h3>90+ Days</h3><p>Rs ${metrics.days90Plus.toFixed(2)}</p></div>
-            <div class="card"><h3>DSO (Annual)</h3><p>${metrics.dso.toFixed(2)} days</p></div>
-        `;
+        function logout() {
+            currentUser = null;
+            document.getElementById("dashboard-container").classList.remove("active");
+            document.getElementById("login-container").classList.add("active");
+        }
 
-        const tableBody = document.getElementById('table-body');
-        tableBody.innerHTML = '';
-        filteredData.slice(0, 10).forEach(row => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${row['S.No.'] || 'N/A'}</td>
-                <td>${row['Name of the Customer'] || 'N/A'}</td>
-                <td>${row['Place'] || 'N/A'}</td>
-                <td>${row['Inv. No.'] || 'N/A'}</td>
-                <td>${row['Inv. Date'] || 'N/A'}</td>
-                <td>${row['DAYS OF INVOICE']}</td>
-                <td>Rs ${row['Invoice Value'].toFixed(2)}</td>
-                <td>Rs ${row['Amount Pending'].toFixed(2)}</td>
-                <td>${row['STATUS'] || 'N/A'}</td>
-            `;
-            tableBody.appendChild(tr);
-        });
-
-        const daysSummary = {
-            '<60 Days': filteredData.filter(row => row['DAYS OF INVOICE'] < 60).reduce((sum, row) => sum + row['Amount Pending'], 0),
-            '60-90 Days': metrics.days60_90,
-            '90+ Days': metrics.days90Plus
-        };
-        if (chartInstance) chartInstance.destroy();
-        chartInstance = new Chart(document.getElementById('days-chart'), {
-            type: 'bar',
-            data: {
-                labels: ['<60 Days', '60-90 Days', '90+ Days'],
-                datasets: [{
-                    label: 'Outstanding Amount (Rs)',
-                    data: [daysSummary['<60 Days'], daysSummary['60-90 Days'], daysSummary['90+ Days']],
-                    backgroundColor: ['#36A2EB', '#FFCE56', '#8B0000']
-                }]
-            },
-            options: {
-                plugins: { title: { display: true, text: 'Outstanding by Days Category' } },
-                scales: { y: { beginAtZero: true } }
+        function togglePasswordChange() {
+            if (currentUser === "ESHAK") {
+                document.getElementById("password-change").classList.toggle("active");
+            } else {
+                document.getElementById("password-error").style.display = "block";
+                setTimeout(() => document.getElementById("password-error").style.display = "none", 2000);
             }
-        });
-    }
+        }
 
-    // Initial fetch and periodic refresh
-    fetchData();
-    setInterval(fetchData, 60000);
-</script>
+        function changePassword() {
+            if (currentUser === "ESHAK") {
+                const user = document.getElementById("change-user").value;
+                const newPassword = document.getElementById("new-password").value;
+                const hashedNewPassword = hashPassword(newPassword);
+                let storedUsers = JSON.parse(localStorage.getItem("users") || "{}");
+                storedUsers[user] = hashedNewPassword;
+                localStorage.setItem("users", JSON.stringify(storedUsers));
+                updatePasswordDropdown(storedUsers);
+                document.getElementById("password-change").classList.remove("active");
+                alert(`Password for ${user} updated successfully!`);
+            } else {
+                document.getElementById("password-error").style.display = "block";
+                setTimeout(() => document.getElementById("password-error").style.display = "none", 2000);
+            }
+        }
+
+        async function fetchData() {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                const text = await response.text();
+                const rows = text.split('\n').map(row => row.split(',').map(cell => cell.trim()));
+                const headers = rows[0].map(header => header.trim().toLowerCase());
+                console.log('Headers:', headers); // Debug headers
+                console.log('Raw Rows:', rows); // Debug raw data
+                data = rows.slice(1).map(row => {
+                    let obj = {};
+                    headers.forEach((header, i) => {
+                        const normalizedHeader = header.replace(/\s+/g, ' ').trim().toLowerCase();
+                        const value = row[i] !== undefined ? row[i].trim() : 'N/A';
+                        obj[normalizedHeader === 's.no.' ? 'S.No.' : 
+                            normalizedHeader === 'name of the customer' ? 'Name of the Customer' : 
+                            normalizedHeader === 'place' ? 'Place' : 
+                            normalizedHeader === 'inv. no.' ? 'Inv. No.' : 
+                            normalizedHeader === 'inv. date' ? 'Inv. Date' : 
+                            normalizedHeader === 'days of invoice' ? 'DAYS OF INVOICE' : 
+                            normalizedHeader === 'invoice value' ? 'Invoice Value' : 
+                            normalizedHeader === 'amount pending' ? 'Amount Pending' : 
+                            normalizedHeader === 'payment recieved date' ? 'PAYMENT RECIEVED DATE' : 
+                            normalizedHeader === 'remarks' ? 'Remarks' : 
+                            normalizedHeader === 'status' ? 'STATUS' : 
+                            normalizedHeader] = value;
+                        // Explicitly map based on column indices
+                        if (i === 0) obj['S.No.'] = value;
+                        if (i === 1) obj['Name of the Customer'] = value;
+                        if (i === 2) obj['Place'] = value; // Place (region) is column C
+                        if (i === 3) obj['Inv. No.'] = value;
+                        if (i === 4) obj['Inv. Date'] = value;
+                        if (i === 5) obj['DAYS OF INVOICE'] = value;
+                        if (i === 6) obj['Invoice Value'] = value;
+                        if (i === 7) obj['Amount Pending'] = value; // Adjusted for correct column
+                        if (i === 8) obj['PAYMENT RECIEVED DATE'] = value;
+                        if (i === 9) obj['Remarks'] = value;
+                        if (i === 10) obj['STATUS'] = value;
+                    });
+                    console.log('Row Place:', obj['Place']); // Debug Place values
+                    // Parse numeric values
+                    obj['DAYS OF INVOICE'] = parseFloat(obj['DAYS OF INVOICE'].replace(/[^0-9.-]+/g, '') || 0);
+                    obj['Invoice Value'] = parseFloat(obj['Invoice Value'].replace(/[₹Rs$,]/g, '').replace(/,/g, '').replace(/\s/g, '') || 0) || 
+                                          parseFloat(obj['Invoice Value'].replace(/[^\d,.]+/g, '').replace(/,/g, '')) || 0;
+                    obj['Amount Pending'] = parseFloat(obj['Amount Pending'].replace(/[₹Rs$,]/g, '').replace(/,/g, '').replace(/\s/g, '') || 0) || 
+                                           parseFloat(obj['Amount Pending'].replace(/[^\d,.]+/g, '').replace(/,/g, '')) || 0;
+                    return obj;
+                });
+                initializeUsers(); // Update users based on new regions
+                updateDashboard();
+                populateAutocomplete('Name of the Customer');
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                document.getElementById('error-message').style.display = 'block';
+                document.getElementById('error-message').innerText = 'Error loading data: ' + error.message;
+            }
+        }
+
+        function populateAutocomplete(searchType) {
+            const input = document.getElementById('search-input');
+            const list = document.getElementById('autocomplete-list');
+            list.innerHTML = '';
+            const uniqueValues = [...new Set(data.map(row => row[searchType]))]
+                .filter(val => val && val.trim() !== '')
+                .sort();
+            console.log(`Autocomplete values for ${searchType}:`, uniqueValues);
+            if (uniqueValues.length === 0) {
+                document.getElementById('error-message').style.display = 'block';
+                document.getElementById('error-message').innerText = `No valid ${searchType} values found in the data.`;
+            }
+            input.addEventListener('input', () => {
+                const query = input.value.toLowerCase();
+                list.innerHTML = '';
+                if (query) {
+                    const matches = uniqueValues.filter(val => val.toLowerCase().includes(query));
+                    matches.forEach(val => {
+                        const div = document.createElement('div');
+                        div.innerText = val;
+                        div.addEventListener('click', () => {
+                            input.value = val;
+                            list.innerHTML = '';
+                            list.style.display = 'none';
+                            updateDashboard();
+                        });
+                        list.appendChild(div);
+                    });
+                    list.style.display = matches.length ? 'block' : 'none';
+                } else {
+                    list.style.display = 'none';
+                }
+            });
+        }
+
+        function computeMetrics(filteredData) {
+            console.log('Filtered Data:', filteredData); // Debug filtered data
+            const totalInvoiceValue = filteredData.reduce((sum, row) => sum + (row['Invoice Value'] || 0), 0);
+            const totalOutstanding = filteredData.reduce((sum, row) => sum + (row['Amount Pending'] || 0), 0);
+            const days60_90 = filteredData
+                .filter(row => (row['DAYS OF INVOICE'] || 0) >= 60 && (row['DAYS OF INVOICE'] || 0) < 90)
+                .reduce((sum, row) => sum + (row['Amount Pending'] || 0), 0);
+            const days90Plus = filteredData
+                .filter(row => (row['DAYS OF INVOICE'] || 0) >= 90)
+                .reduce((sum, row) => sum + (row['Amount Pending'] || 0), 0);
+            const totalReceivables = data.reduce((sum, row) => sum + (row['Amount Pending'] || 0), 0);
+            const totalCreditSales = data.reduce((sum, row) => sum + (row['Invoice Value'] || 0), 0);
+            const dso = totalCreditSales > 0 ? (totalReceivables / totalCreditSales) * 365 : 0;
+            return { totalInvoiceValue, totalOutstanding, days60_90, days90Plus, dso };
+        }
+
+        function updateDashboard() {
+            let filteredData = data;
+            if (currentUser !== "ESHAK") {
+                filteredData = data.filter(row => row['Place'] === currentUser);
+            }
+            const metrics = computeMetrics(filteredData);
+
+            document.getElementById('kpi-cards').innerHTML = `
+                <div class="card"><h3>Total Invoice Value</h3><p>Rs ${metrics.totalInvoiceValue.toFixed(2)}</p></div>
+                <div class="card"><h3>Total Outstanding</h3><p>Rs ${metrics.totalOutstanding.toFixed(2)}</p></div>
+                <div class="card"><h3>60-90 Days</h3><p>Rs ${metrics.days60_90.toFixed(2)}</p></div>
+                <div class="card" data-days="90+"><h3>90+ Days</h3><p>Rs ${metrics.days90Plus.toFixed(2)}</p></div>
+                <div class="card"><h3>DSO (Annual)</h3><p>${metrics.dso.toFixed(2)} days</p></div>
+            `;
+
+            const tableBody = document.getElementById('table-body');
+            tableBody.innerHTML = '';
+            filteredData.slice(0, 10).forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row['S.No.'] || 'N/A'}</td>
+                    <td>${row['Name of the Customer'] || 'N/A'}</td>
+                    <td>${row['Place'] || 'N/A'}</td>
+                    <td>${row['Inv. No.'] || 'N/A'}</td>
+                    <td>${row['Inv. Date'] || 'N/A'}</td>
+                    <td>${row['DAYS OF INVOICE'] || 'N/A'}</td>
+                    <td>Rs ${row['Invoice Value'].toFixed(2) || '0.00'}</td>
+                    <td>Rs ${row['Amount Pending'].toFixed(2) || '0.00'}</td>
+                    <td>${row['PAYMENT RECIEVED DATE'] || 'N/A'}</td>
+                    <td>${row['Remarks'] || 'N/A'}</td>
+                    <td>${row['STATUS'] || 'N/A'}</td>
+     
