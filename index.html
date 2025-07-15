@@ -359,13 +359,15 @@
                         'Remarks': row[9] || 'N/A',
                         'STATUS': row[10] || 'N/A'
                     };
-                    console.log(`Row ${index + 2} Data:`, obj); // Log each row with line number
-                    // Parse numeric values
+                    // Extract first numeric value from Amount Pending
+                    const amountPendingRaw = obj['Amount Pending'];
+                    const amountPendingMatch = amountPendingRaw.match(/[-]?\d*\.?\d+/);
+                    obj['Amount Pending'] = amountPendingMatch ? parseFloat(amountPendingMatch[0]) : 0;
+                    console.log(`Row ${index + 2} Data (Raw Amount Pending: ${amountPendingRaw}, Parsed: ${obj['Amount Pending']}):`, obj);
+                    // Parse other numeric values
                     obj['DAYS OF INVOICE'] = parseFloat(obj['DAYS OF INVOICE'].replace(/[^0-9.-]+/g, '') || 0);
                     obj['Invoice Value'] = parseFloat(obj['Invoice Value'].replace(/[₹Rs$,]/g, '').replace(/,/g, '').replace(/\s/g, '') || 0) || 
                                           parseFloat(obj['Invoice Value'].replace(/[^\d,.]+/g, '').replace(/,/g, '')) || 0;
-                    obj['Amount Pending'] = parseFloat(obj['Amount Pending'].replace(/[₹Rs$,]/g, '').replace(/,/g, '').replace(/\s/g, '') || 0) || 
-                                           parseFloat(obj['Amount Pending'].replace(/[^\d,.]+/g, '').replace(/,/g, '')) || 0;
                     return obj;
                 }).filter(row => row !== null); // Remove null rows
                 console.log('Processed Data:', data); // Log full processed data
