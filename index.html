@@ -34,7 +34,6 @@
 <body>
   <h1>Customer Invoice Dashboard</h1>
 
-  <!-- 🔐 Login Section -->
   <div class="login-box" id="login-box">
     <h3>Login</h3>
     <input type="text" id="username" placeholder="Region name (e.g., hyderabad)" />
@@ -43,7 +42,6 @@
     <p id="login-error" style="color: red;"></p>
   </div>
 
-  <!-- 📊 Dashboard Section -->
   <div id="dashboard" class="dashboard hidden">
     <p><strong>Welcome:</strong> <span id="user-role"></span></p>
 
@@ -71,7 +69,6 @@
       <tbody></tbody>
     </table>
 
-    <!-- 👑 Admin Panel -->
     <div id="admin-panel" class="admin-panel hidden">
       <h2>🔧 Admin: Manage Region Passwords</h2>
       <select id="region-selector"></select>
@@ -82,7 +79,7 @@
   </div>
 
   <script>
-    const CSV_URL = 'YOUR_CSV_URL_HERE'; // Replace with actual published sheet CSV URL
+    const CSV_URL = 'YOUR_CSV_URL_HERE'; // Replace with your actual published CSV link
     let rawData = [];
     let user = null;
     const defaultPassword = '12345678';
@@ -111,8 +108,9 @@
 
       regionPasswords = {};
       rawData.forEach(row => {
-        if (row['Place']) {
-          regionPasswords[row['Place'].toLowerCase()] = row['Password'];
+        const region = row['Place'].toLowerCase();
+        if (!regionPasswords[region]) {
+          regionPasswords[region] = row['Password'] || defaultPassword;
         }
       });
 
@@ -125,21 +123,15 @@
 
       if (regionPasswords[username] && regionPasswords[username] === password) {
         user = { region: username };
-        showDashboard();
+        document.getElementById('login-box').classList.add('hidden');
+        document.getElementById('dashboard').classList.remove('hidden');
+        document.getElementById('user-role').textContent = username === 'eshak' ? 'Admin (Eshak)' : username;
+        fetchCSV();
+        if (username === 'eshak') {
+          document.getElementById('admin-panel').classList.remove('hidden');
+        }
       } else {
         document.getElementById('login-error').textContent = 'Invalid login.';
-      }
-    }
-
-    function showDashboard() {
-      document.getElementById('login-box').classList.add('hidden');
-      document.getElementById('dashboard').classList.remove('hidden');
-      const displayName = user.region === 'eshak' ? 'Admin (Eshak)' : user.region;
-      document.getElementById('user-role').textContent = displayName;
-      fetchCSV();
-
-      if (user.region === 'eshak') {
-        document.getElementById('admin-panel').classList.remove('hidden');
       }
     }
 
@@ -221,9 +213,8 @@
     }
 
     function updatePassword() {
-      const region = document.get
-            function updatePassword() {
       const region = document.getElementById('region-selector').value.trim().toLowerCase();
+      const newPass = document.getElementById('new-password').value.trim
       const newPass = document.getElementById('new-password').value.trim();
 
       if (!newPass) {
@@ -231,19 +222,17 @@
         return;
       }
 
-      // Update password in regionPasswords (for client-side session)
+      // Update password for selected region
       regionPasswords[region] = newPass;
 
-      // Show success message
-      document.getElementById('admin-msg').textContent = `Password for "${region}" updated successfully.`;
-
-      // Optional: Update password in rawData (for autocomplete refresh)
+      // Update all matching rows in rawData
       rawData.forEach(row => {
-        if (row['Place'].toLowerCase() === region) {
+        if (row['Place'].trim().toLowerCase() === region) {
           row['Password'] = newPass;
         }
       });
 
+      document.getElementById('admin-msg').textContent = `Password for "${region}" updated successfully.`;
       document.getElementById('new-password').value = '';
     }
   </script>
