@@ -332,12 +332,19 @@
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                 const text = await response.text();
-                const rows = text.split('\n').map(row => row.split(',').map(cell => cell.trim()));
+                const rows = text.split('\n').map(row => {
+                    // Handle potential extra commas by splitting only on non-escaped commas
+                    return row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => cell.trim().replace(/^"|"$/g, ''));
+                });
                 const headers = rows[0].map(header => header.trim().toLowerCase());
                 console.log('Headers:', headers); // Debug headers
                 console.log('Raw Rows:', rows); // Debug raw data
                 data = rows.slice(1).map(row => {
                     let obj = {};
+                    if (row.length !== headers.length) {
+                        console.warn('Row length mismatch:', row);
+                        return obj; // Skip malformed rows
+                    }
                     headers.forEach((header, i) => {
                         const normalizedHeader = header.replace(/\s+/g, ' ').trim().toLowerCase();
                         const value = row[i] !== undefined ? row[i].trim() : 'N/A';
@@ -353,20 +360,21 @@
                             normalizedHeader === 'remarks' ? 'Remarks' : 
                             normalizedHeader === 'status' ? 'STATUS' : 
                             normalizedHeader] = value;
-                        // Explicitly map based on column indices
-                        if (i === 0) obj['S.No.'] = value;
-                        if (i === 1) obj['Name of the Customer'] = value;
-                        if (i === 2) obj['Place'] = value; // Place (region) is column C
-                        if (i === 3) obj['Inv. No.'] = value;
-                        if (i === 4) obj['Inv. Date'] = value;
-                        if (i === 5) obj['DAYS OF INVOICE'] = value;
-                        if (i === 6) obj['Invoice Value'] = value;
-                        if (i === 7) obj['Amount Pending'] = value;
-                        if (i === 8) obj['PAYMENT RECIEVED DATE'] = value;
-                        if (i === 9) obj['Remarks'] = value;
-                        if (i === 10) obj['STATUS'] = value;
                     });
-                    console.log('Row Data:', obj); // Debug each row
+                    // Explicitly enforce column indices
+                    obj['S.No.'] = row[0] || 'N/A';
+                    obj['Name of the Customer'] = row[1] || 'N/A';
+                    obj['Place'] = row[2] || 'N/A'; // Force Place to column C
+                    obj['Inv. No.'] = row[3] || 'N/A';
+                    obj['Inv. Date'] = row[4] || 'N/A';
+                    obj['DAYS OF INVOICE'] = row[5] || 'N/A';
+                    obj['Invoice Value'] = row[6] || 'N/A';
+                    obj['Amount Pending'] = row[7] || 'N/A';
+                    obj['PAYMENT RECIEVED DATE'] = row[8] || 'N/A';
+                    obj['Remarks'] = row[9] || 'N/A';
+                    obj['STATUS'] = row[10] || 'N/A';
+
+                    console.log('Parsed Row:', obj); // Debug parsed row
                     // Parse numeric values
                     obj['DAYS OF INVOICE'] = parseFloat(obj['DAYS OF INVOICE'].replace(/[^0-9.-]+/g, '') || 0);
                     obj['Invoice Value'] = parseFloat(obj['Invoice Value'].replace(/[₹Rs$,]/g, '').replace(/,/g, '').replace(/\s/g, '') || 0) || 
@@ -374,7 +382,7 @@
                     obj['Amount Pending'] = parseFloat(obj['Amount Pending'].replace(/[₹Rs$,]/g, '').replace(/,/g, '').replace(/\s/g, '') || 0) || 
                                            parseFloat(obj['Amount Pending'].replace(/[^\d,.]+/g, '').replace(/,/g, '')) || 0;
                     return obj;
-                });
+                }).filter(row => Object.keys(row).length > 1); // Filter out empty rows
                 initializeUsers(); // Update users based on new regions
                 updateDashboard();
                 populateAutocomplete('Name of the Customer');
@@ -456,32 +464,23 @@
 
             const tableBody = document.getElementById('table-body');
             tableBody.innerHTML = '';
-            // Group by customer within the filtered region
-            const customerData = filteredData.reduce((acc, row) => {
-                const customer = row['Name of the Customer'];
-                if (!acc[customer]) acc[customer] = [];
-                acc[customer].push(row);
-                return acc;
-            }, {});
-
-            Object.values(customerData).forEach(customerRows => {
-                customerRows.forEach(row => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${row['S.No.'] || 'N/A'}</td>
-                        <td>${row['Name of the Customer'] || 'N/A'}</td>
-                        <td>${row['Place'] || 'N/A'}</td>
-                        <td>${row['Inv. No.'] || 'N/A'}</td>
-                        <td>${row['Inv. Date'] || 'N/A'}</td>
-                        <td>${row['DAYS OF INVOICE'] || 'N/A'}</td>
-                        <td>Rs ${row['Invoice Value'].toFixed(2) || '0.00'}</td>
-                        <td>Rs ${row['Amount Pending'].toFixed(2) || '0.00'}</td>
-                        <td>${row['PAYMENT RECIEVED DATE'] || 'N/A'}</td>
-                        <td>${row['Remarks'] || 'N/A'}</td>
-                        <td>${row['STATUS'] || 'N/A'}</td>
-                    `;
-                    tableBody.appendChild(tr);
-                });
+            // Display individual rows without grouping by customer
+            filteredData.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row['S.No.'] || 'N/A'}</td>
+                    <td>${row['Name of the Customer'] || 'N/A'}</td>
+                    <td>${row['Place'] || 'N/A'}</td>
+                    <td>${row['Inv. No.'] || 'N/A'}</td>
+                    <td>${row['Inv. Date'] || 'N/A'}</td>
+                    <td>${row['DAYS OF INVOICE'] || 'N/A'}</td>
+                    <td>Rs ${row['Invoice Value'].toFixed(2) || '0.00'}</td>
+                    <td>Rs ${row['Amount Pending'].toFixed(2) || '0.00'}</td>
+                    <td>${row['PAYMENT RECIEVED DATE'] || 'N/A'}</td>
+                    <td>${row['Remarks'] || 'N/A'}</td>
+                    <td>${row['STATUS'] || 'N/A'}</td>
+                `;
+                tableBody.appendChild(tr);
             });
 
             const daysSummary = {
