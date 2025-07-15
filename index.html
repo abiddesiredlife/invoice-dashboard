@@ -1,528 +1,245 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Olive OS Invoice Dashboard</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f4f4f9;
-            text-align: center;
-        }
-        h1 {
-            color: #333;
-        }
-        .login-container {
-            display: none;
-            max-width: 400px;
-            margin: 50px auto;
-            padding: 20px;
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        .login-container.active {
-            display: block;
-        }
-        .login-container input, .login-container button {
-            display: block;
-            width: 100%;
-            margin: 10px 0;
-            padding: 10px;
-            font-size: 16px;
-        }
-        .dashboard-container {
-            display: none;
-        }
-        .dashboard-container.active {
-            display: block;
-        }
-        .search-container {
-            margin: 20px 0;
-            position: relative;
-        }
-        .search-container label {
-            font-size: 18px;
-            margin-right: 10px;
-        }
-        .search-container input[type="radio"] {
-            margin: 0 5px;
-        }
-        #search-input {
-            width: 50%;
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        #autocomplete-list {
-            position: absolute;
-            width: 50%;
-            max-height: 200px;
-            overflow-y: auto;
-            background-color: white;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            z-index: 1000;
-            display: none;
-        }
-        #autocomplete-list div {
-            padding: 10px;
-            cursor: pointer;
-        }
-        #autocomplete-list div:hover {
-            background-color: #f0f0f0;
-        }
-        .card-container {
-            display: flex;
-            justify-content: space-around;
-            flex-wrap: wrap;
-            margin: 20px 0;
-        }
-        .card {
-            background-color: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            margin: 10px;
-            width: 18%;
-            min-width: 150px;
-            text-align: center;
-            word-wrap: break-word;
-        }
-        .card h3 {
-            margin: 0 0 10px;
-            font-size: 18px;
-        }
-        .card p {
-            margin: 0;
-            font-size: 24px;
-            font-weight: bold;
-            overflow: hidden;
-        }
-        .card[data-days="90+"] {
-            background-color: #8B0000;
-            color: white;
-        }
-        table {
-            border-collapse: collapse;
-            width: 80%;
-            margin: 20px auto;
-            background-color: white;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 10px;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        canvas {
-            max-width: 80%;
-            margin: 20px auto;
-        }
-        #error-message {
-            color: red;
-            margin: 20px;
-            display: none;
-        }
-        .password-change {
-            display: none;
-            max-width: 400px;
-            margin: 20px auto;
-            padding: 20px;
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        .password-change.active {
-            display: block;
-        }
-        @media (max-width: 768px) {
-            .card {
-                width: 45%;
-            }
-            #search-input, #autocomplete-list {
-                width: 80%;
-            }
-            table, canvas {
-                width: 95%;
-            }
-        }
-    </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Customer Invoice Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h1, h2 { text-align: center; }
+    .hidden { display: none; }
+    .login-box, .dashboard { max-width: 600px; margin: auto; }
+    input[type="text"], input[type="password"], select {
+      width: 100%; padding: 8px; margin-top: 10px;
+    }
+    button { padding: 10px 20px; margin-top: 10px; }
+    .autocomplete-suggestions {
+      background: #f1f1f1; border: 1px solid #ccc;
+      max-height: 150px; overflow-y: auto; margin-top: 5px;
+    }
+    .autocomplete-suggestions div {
+      padding: 5px; cursor: pointer;
+    }
+    .autocomplete-suggestions div:hover {
+      background: #ddd;
+    }
+    table, th, td {
+      border: 1px solid #aaa; border-collapse: collapse;
+      padding: 8px; text-align: left; margin-top: 20px; width: 100%;
+    }
+    th { background-color: #eee; }
+    .admin-panel { margin-top: 30px; }
+  </style>
 </head>
 <body>
-    <div class="login-container active" id="login-container">
-        <h2>Login</h2>
-        <input type="text" id="username" placeholder="Username" required>
-        <input type="password" id="password" placeholder="Password" required>
-        <button onclick="login()">Login</button>
-        <div id="login-error" style="color: red; display: none;">Invalid username or password.</div>
-    </div>
-    <div class="dashboard-container" id="dashboard-container">
-        <h1>Olive OS Invoice Dashboard</h1>
-        <div id="error-message"></div>
-        <div class="search-container">
-            <label>Search By:</label>
-            <input type="radio" name="search-type" value="Name of the Customer" id="customer-radio" checked>
-            <label for="customer-radio">Customer</label>
-            <input type="radio" name="search-type" value="Place" id="region-radio">
-            <label for="region-radio">Region</label>
-            <br>
-            <input type="text" id="search-input" placeholder="Start typing to search...">
-            <div id="autocomplete-list"></div>
-        </div>
-        <div class="card-container" id="kpi-cards"></div>
-        <canvas id="days-chart"></canvas>
-        <table id="data-table">
-            <thead>
-                <tr>
-                    <th>S.No.</th>
-                    <th>Name of the Customer</th>
-                    <th>Place</th>
-                    <th>Inv. No.</th>
-                    <th>Inv. Date</th>
-                    <th>DAYS OF INVOICE</th>
-                    <th>Invoice Value</th>
-                    <th>Amount Pending</th>
-                    <th>PAYMENT RECIEVED DATE</th>
-                    <th>Remarks</th>
-                    <th>STATUS</th>
-                </tr>
-            </thead>
-            <tbody id="table-body"></tbody>
-        </table>
-        <button onclick="togglePasswordChange()" id="change-password-btn" style="display: none;">Change Passwords</button>
-        <button onclick="logout()">Logout</button>
-        <div class="password-change" id="password-change">
-            <h3>Change Password</h3>
-            <select id="change-user">
-                <option value="ESHAK">ESHAK (Admin)</option>
-            </select>
-            <input type="password" id="new-password" placeholder="New Password" required>
-            <button onclick="changePassword()">Save</button>
-            <div id="password-error" style="color: red; display: none;">Only admin can change passwords.</div>
-        </div>
+  <h1>Customer Invoice Dashboard</h1>
+
+  <div class="login-box" id="login-box">
+    <h3>Login</h3>
+    <input type="text" id="username" placeholder="Region name (e.g., hyderabad)" />
+    <input type="password" id="password" placeholder="Password" />
+    <button onclick="login()">Login</button>
+    <p id="login-error" style="color: red;"></p>
+  </div>
+
+  <div id="dashboard" class="dashboard hidden">
+    <p><strong>Welcome:</strong> <span id="user-role"></span></p>
+
+    <div class="search-section">
+      <label><input type="radio" name="search-type" value="Place" checked /> Region</label>
+      <label><input type="radio" name="search-type" value="Name of the Customer" /> Customer</label>
+      <input type="text" id="search-input" placeholder="Search..." />
+      <div id="autocomplete" class="autocomplete-suggestions"></div>
     </div>
 
-    <script>
-        const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSR58lwdxbah0w6oeokmaT1MuOciAyhMFJoIwD-2YsPJeU5XOA6BF7EdAgej4tQz73_Ub_XpUuip4HZ/pub?output=csv";
-        let data = [];
-        let chartInstance = null;
-        let currentUser     = null;
+    <div class="metrics">
+      <p><strong>Total Invoice Value:</strong> ₹<span id="total-invoice">0</span></p>
+      <p><strong>Total Outstanding:</strong> ₹<span id="total-outstanding">0</span></p>
+    </div>
 
-        // Simple hash function for passwords
-        function hashPassword(password) {
-            let hash = 0;
-            for (let i = 0; i < password.length; i++) {
-                hash = (hash << 5) - hash + password.charCodeAt(i);
-                hash |= 0;
-            }
-            return hash.toString();
+    <table id="data-table">
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>Region</th>
+          <th>Invoice Value</th>
+          <th>Outstanding</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div id="admin-panel" class="admin-panel hidden">
+      <h2>🔧 Admin: Manage Region Passwords</h2>
+      <select id="region-selector"></select>
+      <input type="text" id="new-password" placeholder="New Password" />
+      <button onclick="updatePassword()">Update Password</button>
+      <p id="admin-msg" style="color: green;"></p>
+    </div>
+  </div>
+
+  <script>
+    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSR58lwdxbah0w6oeokmaT1MuOciAyhMFJoIwD-2YsPJeU5XOA6BF7EdAgej4tQz73_Ub_XpUuip4HZ/pub?output=csv';
+    let rawData = [];
+    let user = null;
+    const defaultPassword = '12345678';
+    let regionPasswords = {};
+
+    async function fetchCSV() {
+      const res = await fetch(CSV_URL);
+      const text = await res.text();
+      parseCSV(text);
+    }
+
+    function parseCSV(csv) {
+      const lines = csv.trim().split('\n');
+      const headers = lines[0].split(',').map(h => h.trim());
+      rawData = lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim());
+        const row = {};
+        headers.forEach((h, i) => row[h] = values[i]);
+        row['Invoice Value'] = parseFloat(row['Invoice Value']) || 0;
+        row['Outstanding'] = parseFloat(row['Outstanding']) || 0;
+        row['Place'] = row['Place'].trim();
+        row['Name of the Customer'] = row['Name of the Customer'].trim();
+        row['Password'] = row['Password'] || defaultPassword;
+        return row;
+      });
+
+      regionPasswords = {};
+      rawData.forEach(row => {
+        const region = row['Place'].toLowerCase();
+        regionPasswords[region] = row['Password'] || defaultPassword;
+      });
+
+      setupAfterLogin();
+    }
+
+    function login() {
+      const username = document.getElementById('username').value.trim().toLowerCase();
+      const password = document.getElementById('password').value.trim();
+
+      if (regionPasswords[username] && regionPasswords[username] === password) {
+        user = { region: username };
+        document.getElementById('login-box').classList.add('hidden');
+        document.getElementById('dashboard').classList.remove('hidden');
+        document.getElementById('user-role').textContent = username === 'eshak' ? 'Admin (Eshak)' : username;
+        fetchCSV();
+        if (username === 'eshak') {
+          document.getElementById('admin-panel').classList.remove('hidden');
         }
+      } else {
+        document.getElementById('login-error').textContent = 'Invalid login. Please check region name and password.';
+      }
+    }
 
-        // Initialize or update users based on data
-        function initializeUsers() {
-            let storedUsers = JSON.parse(localStorage.getItem("users") || "{}");
-            const defaultPassword = hashPassword("12345678");
-            const adminUser     = "ESHAK";
-            if (!storedUsers[adminUser    ]) storedUsers[adminUser    ] = defaultPassword;
+    function setupAfterLogin() {
+      updateAutocomplete();
+      updateDashboard();
 
-            // Extract unique regions from data
-            const uniqueRegions = [...new Set(data.map(row => row['Place']?.trim()))].filter(region => region && region !== "N/A");
-            uniqueRegions.forEach(region => {
-                if (!storedUsers[region]) storedUsers[region] = defaultPassword;
-            });
-            localStorage.setItem("users", JSON.stringify(storedUsers));
-            updatePasswordDropdown(storedUsers);
-        }
-
-        function updatePasswordDropdown(users) {
-            const select = document.getElementById("change-user");
-            select.innerHTML = '<option value="ESHAK">ESHAK (Admin)</option>';
-            Object.keys(users).forEach(user => {
-                if (user !== "ESHAK") {
-                    select.innerHTML += `<option value="${user}">${user}</option>`;
-                }
-            });
-        }
-
-        function login() {
-            try {
-                const usernameInput = document.getElementById("username").value.trim();
-                const password = document.getElementById("password").value.trim();
-                if (!usernameInput || !password) {
-                    document.getElementById("login-error").innerText = "Please enter both username and password.";
-                    document.getElementById("login-error").style.display = "block";
-                    return;
-                }
-
-                const username = usernameInput.toLowerCase(); // Case-insensitive
-                const hashedPassword = hashPassword(password);
-                const storedUsers = JSON.parse(localStorage.getItem("users") || "{}");
-
-                console.log("Attempting login:", { username, password, hashedPassword, storedUsers }); // Debug login
-                const actualUsername = Object.keys(storedUsers).find(user => user.toLowerCase() === username);
-                if (actualUsername && storedUsers[actualUsername] === hashedPassword) {
-                    currentUser     = actualUsername;
-                    document.getElementById("login-container").classList.remove("active");
-                    document.getElementById("dashboard-container").classList.add("active");
-                    if (currentUser     === "ESHAK") {
-                        document.getElementById("change-password-btn").style.display = "block";
-                    }
-                    fetchData().catch(error => {
-                        console.error("Fetch error during login:", error);
-                        document.getElementById("error-message").style.display = "block";
-                        document.getElementById("error-message").innerText = "Failed to load data: " + error.message;
-                        document.getElementById("dashboard-container").classList.remove("active");
-                        document.getElementById("login-container").classList.add("active");
-                    });
-                } else {
-                    document.getElementById("login-error").innerText = "Invalid username or password.";
-                    document.getElementById("login-error").style.display = "block";
-                }
-            } catch (error) {
-                console.error("Login error:", error);
-                document.getElementById("login-error").innerText = "Error during login: " + error.message;
-                document.getElementById("login-error").style.display = "block";
-            }
-        }
-
-        function logout() {
-            currentUser     = null;
-            document.getElementById("dashboard-container").classList.remove("active");
-            document.getElementById("login-container").classList.add("active");
-        }
-
-        function togglePasswordChange() {
-            if (currentUser     === "ESHAK") {
-                document.getElementById("password-change").classList.toggle("active");
-            } else {
-                document.getElementById("password-error").style.display = "block";
-                setTimeout(() => document.getElementById("password-error").style.display = "none", 2000);
-            }
-        }
-
-        function changePassword() {
-            if (currentUser     === "ESHAK") {
-                const user = document.getElementById("change-user").value;
-                const newPassword = document.getElementById("new-password").value;
-                const hashedNewPassword = hashPassword(newPassword);
-                let storedUsers = JSON.parse(localStorage.getItem("users") || "{}");
-                storedUsers[user] = hashedNewPassword;
-                localStorage.setItem("users", JSON.stringify(storedUsers));
-                updatePasswordDropdown(storedUsers);
-                document.getElementById("password-change").classList.remove("active");
-                alert(`Password for ${user} updated successfully!`);
-            } else {
-                document.getElementById("password-error").style.display = "block";
-                setTimeout(() => document.getElementById("password-error").style.display = "none", 2000);
-            }
-        }
-
-        async function fetchData() {
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-                const text = await response.text();
-                Papa.parse(text, {
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: function(results) {
-                        console.log('Parsed CSV Headers:', results.meta.fields);
-                        data = results.data.map((row, index) => {
-                            const obj = {
-                                'S.No.': row['s.no.'] || 'N/A',
-                                'Name of the Customer': row['name of the customer'] || 'N/A',
-                                'Place': row['place'] || 'N/A',
-                                'Inv. No.': row['inv. no.'] || 'N/A',
-                                'Inv. Date': row['inv. date'] || 'N/A',
-                                'DAYS OF INVOICE': row['days of invoice'] || 'N/A',
-                                'Invoice Value': row['invoice value'] || 'N/A',
-                                'Amount Pending': row['amount pending'] || 'N/A',
-                                'PAYMENT RECIEVED DATE': row['payment recieved date'] || 'N/A',
-                                'Remarks': row['remarks'] || 'N/A',
-                                'STATUS': row['status'] || 'N/A'
-                            };
-                            // Extract first numeric value from Amount Pending
-                            const amountPendingRaw = obj['Amount Pending'];
-                            const amountPendingMatch = amountPendingRaw.match(/[-]?\d*\.?\d+/);
-                            obj['Amount Pending'] = amountPendingMatch ? parseFloat(amountPendingMatch[0]) : 0;
-                            console.log(`Row ${index + 2} Data (Raw Amount Pending: ${amountPendingRaw}, Parsed: ${obj['Amount Pending']}):`, obj);
-                            // Parse other numeric values
-                            obj['DAYS OF INVOICE'] = parseFloat(obj['DAYS OF INVOICE'].replace(/[^0-9.-]+/g, '') || 0);
-                            obj['Invoice Value'] = parseFloat(obj['Invoice Value'].replace(/[₹Rs$,]/g, '').replace(/,/g, '').replace(/\s/g, '') || 0) || 
-                                                  parseFloat(obj['Invoice Value'].replace(/[^\d,.]+/g, '').replace(/,/g, '')) || 0;
-                            return obj;
-                        });
-                        console.log('Processed Data:', data);
-                        initializeUsers();
-                        updateDashboard();
-                        populateAutocomplete('Name of the Customer'); // Default to customer search
-                    },
-                    error: function(error) {
-                        throw new Error('Papa Parse error: ' + error.message);
-                    }
-                });
-            } catch (error) {
-                console.error('Fetch error:', error);
-                document.getElementById('error-message').style.display = 'block';
-                document.getElementById('error-message').innerText = 'Error loading data: ' + error.message;
-                throw error;
-            }
-        }
-
-        function populateAutocomplete(searchType) {
-            const input = document.getElementById('search-input');
-            const list = document.getElementById('autocomplete-list');
-            list.innerHTML = '';
-            let uniqueValues;
-
-            if (searchType === 'Place') {
-                uniqueValues = [...new Set(data.map(row => row['Place']))].filter(val => val && val.trim() !== '').sort();
-            } else {
-                uniqueValues = [...new Set(data.map(row => row['Name of the Customer']))].filter(val => val && val.trim() !== '').sort();
-            }
-
-            console.log(`Autocomplete values for ${searchType}:`, uniqueValues);
-            if (uniqueValues.length === 0) {
-                document.getElementById('error-message').style.display = 'block';
-                document.getElementById('error-message').innerText = `No valid ${searchType} values found in the data.`;
-            }
-
-            input.addEventListener('input', () => {
-                const query = input.value.toLowerCase();
-                list.innerHTML = '';
-                if (query) {
-                    const matches = uniqueValues.filter(val => val.toLowerCase().includes(query));
-                    matches.forEach(val => {
-                        const div = document.createElement('div');
-                        div.innerText = val;
-                        div.addEventListener('click', () => {
-                            input.value = val;
-                            list.innerHTML = '';
-                            list.style.display = 'none';
-                            updateDashboard();
-                        });
-                        list.appendChild(div);
-                    });
-                    list.style.display = matches.length ? 'block' : 'none';
-                } else {
-                    list.style.display = 'none';
-                }
-            });
-        }
-
-        function computeMetrics(filteredData) {
-            console.log('Filtered Data for Metrics:', filteredData);
-            const totalInvoiceValue = filteredData.reduce((sum, row) => sum + (row['Invoice Value'] || 0), 0);
-            const totalOutstanding = filteredData.reduce((sum, row) => sum + (row['Amount Pending'] || 0), 0);
-            const days60_90 = filteredData
-                .filter(row => (row['DAYS OF INVOICE'] || 0) >= 60 && (row['DAYS OF INVOICE'] || 0) < 90)
-                .reduce((sum, row) => sum + (row['Amount Pending'] || 0), 0);
-            const days90Plus = filteredData
-                .filter(row => (row['DAYS OF INVOICE'] || 0) >= 90)
-                .reduce((sum, row) => sum + (row['Amount Pending'] || 0), 0);
-            return { totalInvoiceValue, totalOutstanding, days60_90, days90Plus };
-        }
-
-        function updateDashboard() {
-            let filteredData = data;
-            const searchType = document.querySelector('input[name="search-type"]:checked').value;
-            const searchValue = document.getElementById('search-input').value.trim();
-
-            if (searchType === 'Name of the Customer') {
-                filteredData = data.filter(row => row['Name of the Customer'] === searchValue);
-            } else if (searchType === 'Place') {
-                filteredData = data.filter(row => row['Place'] === searchValue);
-            }
-
-            const metrics = computeMetrics(filteredData);
-
-            // Display region-level KPIs
-            document.getElementById('kpi-cards').innerHTML = `
-                <div class="card"><h3>Total Invoice Value</h3><p>Rs ${metrics.totalInvoiceValue.toFixed(2)}</p></div>
-                <div class="card"><h3>Total Outstanding</h3><p>Rs ${metrics.totalOutstanding.toFixed(2)}</p></div>
-                <div class="card"><h3>60-90 Days</h
-                                <div class="card"><h3>60-90 Days</h3><p>Rs ${metrics.days60_90.toFixed(2)}</p></div>
-                <div class="card"><h3>90+ Days</h3><p>Rs ${metrics.days90Plus.toFixed(2)}</p></div>
-            `;
-
-            // Update the data table
-            const tableBody = document.getElementById('table-body');
-            tableBody.innerHTML = '';
-            filteredData.forEach((row, index) => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${row['S.No.']}</td>
-                    <td>${row['Name of the Customer']}</td>
-                    <td>${row['Place']}</td>
-                    <td>${row['Inv. No.']}</td>
-                    <td>${row['Inv. Date']}</td>
-                    <td>${row['DAYS OF INVOICE']}</td>
-                    <td>Rs ${row['Invoice Value'].toFixed(2)}</td>
-                    <td>Rs ${row['Amount Pending'].toFixed(2)}</td>
-                    <td>${row['PAYMENT RECIEVED DATE']}</td>
-                    <td>${row['Remarks']}</td>
-                    <td>${row['STATUS']}</td>
-                `;
-                tableBody.appendChild(tr);
-            });
-
-            // Update the chart
-            const daysOutstanding = [0, 0, 0]; // 0-30, 31-60, 60+
-            filteredData.forEach(row => {
-                const days = row['DAYS OF INVOICE'] || 0;
-                if (days <= 30) {
-                    daysOutstanding[0] += row['Amount Pending'] || 0;
-                } else if (days <= 60) {
-                    daysOutstanding[1] += row['Amount Pending'] || 0;
-                } else {
-                    daysOutstanding[2] += row['Amount Pending'] || 0;
-                }
-            });
-
-            if (chartInstance) {
-                chartInstance.destroy();
-            }
-            const ctx = document.getElementById('days-chart').getContext('2d');
-            chartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['0-30 Days', '31-60 Days', '60+ Days'],
-                    datasets: [{
-                        label: 'Outstanding Amount',
-                        data: daysOutstanding,
-                        backgroundColor: ['#4CAF50', '#FF9800', '#F44336'],
-                    }]
-                },
-                options: {
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-        }
-
-        // Event listeners for search type change
-        document.getElementById('customer-radio').addEventListener('change', () => {
-            populateAutocomplete('Name of the Customer');
+      if (user.region === 'eshak') {
+        const regions = [...new Set(rawData.map(r => r['Place'].trim()))];
+        const selector = document.getElementById('region-selector');
+        selector.innerHTML = '';
+        regions.forEach(region => {
+          const opt = document.createElement('option');
+          opt.value = region;
+          opt.textContent = region;
+          selector.appendChild(opt);
         });
-        document.getElementById('region-radio').addEventListener('change', () => {
-            populateAutocomplete('Place');
-        });
+      }
+    }
 
-        // Initial fetch of data
-        fetchData();
-    </script>
+    function filteredRows() {
+      return rawData.filter(row => {
+        if (user.region === 'eshak') return true;
+        return row['Place'].toLowerCase() === user.region;
+      });
+    }
+
+    function updateAutocomplete() {
+      const searchType = document.querySelector('input[name="search-type"]:checked').value;
+      const suggestions = [...new Set(filteredRows().map(r => r[searchType]))];
+      const container = document.getElementById('autocomplete');
+      container.innerHTML = '';
+      suggestions.forEach(val => {
+        const div = document.createElement('div');
+        div.textContent = val;
+        div.onclick = () => {
+          document.getElementById('search-input').value = val;
+          updateDashboard();
+        };
+        container.appendChild(div);
+      });
+    }
+
+    function updateDashboard() {
+      const type = document.querySelector('input[name="search-type"]:checked').value;
+      const value = document.getElementById('search-input').value.trim().toLowerCase();
+
+      const rows = filteredRows().filter(row =>
+        !value || row[type].toLowerCase() === value
+      );
+
+      const totalInv = rows.reduce((sum, r) => sum + r['Invoice Value'], 0);
+      const totalOut = rows.reduce((sum, r) => sum + r['Outstanding'], 0);
+
+      document.getElementById('total-invoice').textContent = totalInv.toFixed(2);
+      document.getElementById('total-outstanding').textContent = totalOut.toFixed(2);
+
+      const tbody = document.querySelector('#data-table tbody');
+      tbody.innerHTML = '';
+      if (rows.length === 0) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 4;
+        td.textContent = 'No matching data found.';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${r['Name of the Customer']}</td>
+          <td>${r['Place']}</td>
+          <td>₹${r['Invoice Value'].toFixed(2)}</td>
+          <td>₹${r['Outstanding'].toFixed(2)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updatePassword() {
+      const region = document.getElementById('region-selector').value.trim().toLowerCase();
+      const newPassword = document.getElementById('new-password').value.trim();
+
+      if (!newPassword) {
+        document.getElementById('admin-msg').textContent = 'Please enter a new password.';
+        return;
+      }
+
+      regionPasswords[region] = newPassword;
+
+      rawData.forEach(row => {
+        if (row['Place'].trim().toLowerCase() === region) {
+          row['Password'] = newPassword;
+        }
+      });
+
+      document.getElementById('admin-msg').textContent = `Password for "${region}" updated successfully.`;
+      document.getElementById('new-password').value = '';
+    }
+
+    document.querySelectorAll('input[name="search-type"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        updateAutocomplete();
+        updateDashboard();
+      });
+    });
+
+    document.getElementById('search-input').addEventListener('input', updateDashboard);
+  </script>
 </body>
 </html>
