@@ -366,7 +366,7 @@
                         if (i === 9) obj['Remarks'] = value;
                         if (i === 10) obj['STATUS'] = value;
                     });
-                    console.log('Row Place:', obj['Place']); // Debug Place values
+                    console.log('Row Data:', obj); // Debug each row
                     // Parse numeric values
                     obj['DAYS OF INVOICE'] = parseFloat(obj['DAYS OF INVOICE'].replace(/[^0-9.-]+/g, '') || 0);
                     obj['Invoice Value'] = parseFloat(obj['Invoice Value'].replace(/[₹Rs$,]/g, '').replace(/,/g, '').replace(/\s/g, '') || 0) || 
@@ -442,8 +442,10 @@
             if (currentUser !== "ESHAK") {
                 filteredData = data.filter(row => row['Place'] === currentUser);
             }
+
             const metrics = computeMetrics(filteredData);
 
+            // Display region-level KPIs
             document.getElementById('kpi-cards').innerHTML = `
                 <div class="card"><h3>Total Invoice Value</h3><p>Rs ${metrics.totalInvoiceValue.toFixed(2)}</p></div>
                 <div class="card"><h3>Total Outstanding</h3><p>Rs ${metrics.totalOutstanding.toFixed(2)}</p></div>
@@ -454,22 +456,32 @@
 
             const tableBody = document.getElementById('table-body');
             tableBody.innerHTML = '';
-            filteredData.slice(0, 10).forEach(row => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${row['S.No.'] || 'N/A'}</td>
-                    <td>${row['Name of the Customer'] || 'N/A'}</td>
-                    <td>${row['Place'] || 'N/A'}</td>
-                    <td>${row['Inv. No.'] || 'N/A'}</td>
-                    <td>${row['Inv. Date'] || 'N/A'}</td>
-                    <td>${row['DAYS OF INVOICE'] || 'N/A'}</td>
-                    <td>Rs ${row['Invoice Value'].toFixed(2) || '0.00'}</td>
-                    <td>Rs ${row['Amount Pending'].toFixed(2) || '0.00'}</td>
-                    <td>${row['PAYMENT RECIEVED DATE'] || 'N/A'}</td>
-                    <td>${row['Remarks'] || 'N/A'}</td>
-                    <td>${row['STATUS'] || 'N/A'}</td>
-                `;
-                tableBody.appendChild(tr);
+            // Group by customer within the filtered region
+            const customerData = filteredData.reduce((acc, row) => {
+                const customer = row['Name of the Customer'];
+                if (!acc[customer]) acc[customer] = [];
+                acc[customer].push(row);
+                return acc;
+            }, {});
+
+            Object.values(customerData).forEach(customerRows => {
+                customerRows.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row['S.No.'] || 'N/A'}</td>
+                        <td>${row['Name of the Customer'] || 'N/A'}</td>
+                        <td>${row['Place'] || 'N/A'}</td>
+                        <td>${row['Inv. No.'] || 'N/A'}</td>
+                        <td>${row['Inv. Date'] || 'N/A'}</td>
+                        <td>${row['DAYS OF INVOICE'] || 'N/A'}</td>
+                        <td>Rs ${row['Invoice Value'].toFixed(2) || '0.00'}</td>
+                        <td>Rs ${row['Amount Pending'].toFixed(2) || '0.00'}</td>
+                        <td>${row['PAYMENT RECIEVED DATE'] || 'N/A'}</td>
+                        <td>${row['Remarks'] || 'N/A'}</td>
+                        <td>${row['STATUS'] || 'N/A'}</td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
             });
 
             const daysSummary = {
