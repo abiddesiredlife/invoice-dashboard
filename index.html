@@ -212,7 +212,7 @@
     </div>
 
     <script>
-        const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrtlUIgWw1mxcwNTm_e_YkfW_cr0tmPM4o0S2wHdLQ3Gv4NgfPOwp_kv1pTAIZ1Q/pub?output=csv";
+        const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSR58lwdxbah0w6oeokmaT1MuOciAyhMFJoIwD-2YsPJeU5XOA6BF7EdAgej4tQz73_Ub_XpUuip4HZ/pub?output=csv";
         let data = [];
         let chartInstance = null;
         let currentUser = null;
@@ -333,48 +333,33 @@
                 if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                 const text = await response.text();
                 const rows = text.split('\n').map(row => {
-                    // Handle potential extra commas by splitting only on non-escaped commas
+                    // Handle quoted fields and extra commas
                     return row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => cell.trim().replace(/^"|"$/g, ''));
                 });
                 const headers = rows[0].map(header => header.trim().toLowerCase());
-                console.log('Headers:', headers); // Debug headers
-                console.log('Raw Rows:', rows); // Debug raw data
-                data = rows.slice(1).map(row => {
-                    let obj = {};
+                console.log('Detected Headers:', headers); // Log actual headers from CSV
+                if (headers.length < 11 || !headers.includes('place')) {
+                    throw new Error('Invalid CSV header structure. Expected 11 columns including "place".');
+                }
+                data = rows.slice(1).map((row, index) => {
                     if (row.length !== headers.length) {
-                        console.warn('Row length mismatch:', row);
-                        return obj; // Skip malformed rows
+                        console.warn(`Row ${index + 2} length mismatch:`, row);
+                        return null; // Skip malformed rows
                     }
-                    headers.forEach((header, i) => {
-                        const normalizedHeader = header.replace(/\s+/g, ' ').trim().toLowerCase();
-                        const value = row[i] !== undefined ? row[i].trim() : 'N/A';
-                        obj[normalizedHeader === 's.no.' ? 'S.No.' : 
-                            normalizedHeader === 'name of the customer' ? 'Name of the Customer' : 
-                            normalizedHeader === 'place' ? 'Place' : 
-                            normalizedHeader === 'inv. no.' ? 'Inv. No.' : 
-                            normalizedHeader === 'inv. date' ? 'Inv. Date' : 
-                            normalizedHeader === 'days of invoice' ? 'DAYS OF INVOICE' : 
-                            normalizedHeader === 'invoice value' ? 'Invoice Value' : 
-                            normalizedHeader === 'amount pending' ? 'Amount Pending' : 
-                            normalizedHeader === 'payment recieved date' ? 'PAYMENT RECIEVED DATE' : 
-                            normalizedHeader === 'remarks' ? 'Remarks' : 
-                            normalizedHeader === 'status' ? 'STATUS' : 
-                            normalizedHeader] = value;
-                    });
-                    // Explicitly enforce column indices
-                    obj['S.No.'] = row[0] || 'N/A';
-                    obj['Name of the Customer'] = row[1] || 'N/A';
-                    obj['Place'] = row[2] || 'N/A'; // Force Place to column C
-                    obj['Inv. No.'] = row[3] || 'N/A';
-                    obj['Inv. Date'] = row[4] || 'N/A';
-                    obj['DAYS OF INVOICE'] = row[5] || 'N/A';
-                    obj['Invoice Value'] = row[6] || 'N/A';
-                    obj['Amount Pending'] = row[7] || 'N/A';
-                    obj['PAYMENT RECIEVED DATE'] = row[8] || 'N/A';
-                    obj['Remarks'] = row[9] || 'N/A';
-                    obj['STATUS'] = row[10] || 'N/A';
-
-                    console.log('Parsed Row:', obj); // Debug parsed row
+                    const obj = {
+                        'S.No.': row[0] || 'N/A',
+                        'Name of the Customer': row[1] || 'N/A',
+                        'Place': row[2] || 'N/A', // Explicitly map Place to column C
+                        'Inv. No.': row[3] || 'N/A',
+                        'Inv. Date': row[4] || 'N/A',
+                        'DAYS OF INVOICE': row[5] || 'N/A',
+                        'Invoice Value': row[6] || 'N/A',
+                        'Amount Pending': row[7] || 'N/A',
+                        'PAYMENT RECIEVED DATE': row[8] || 'N/A',
+                        'Remarks': row[9] || 'N/A',
+                        'STATUS': row[10] || 'N/A'
+                    };
+                    console.log(`Row ${index + 2} Data:`, obj); // Log each row with line number
                     // Parse numeric values
                     obj['DAYS OF INVOICE'] = parseFloat(obj['DAYS OF INVOICE'].replace(/[^0-9.-]+/g, '') || 0);
                     obj['Invoice Value'] = parseFloat(obj['Invoice Value'].replace(/[₹Rs$,]/g, '').replace(/,/g, '').replace(/\s/g, '') || 0) || 
@@ -382,15 +367,16 @@
                     obj['Amount Pending'] = parseFloat(obj['Amount Pending'].replace(/[₹Rs$,]/g, '').replace(/,/g, '').replace(/\s/g, '') || 0) || 
                                            parseFloat(obj['Amount Pending'].replace(/[^\d,.]+/g, '').replace(/,/g, '')) || 0;
                     return obj;
-                }).filter(row => Object.keys(row).length > 1); // Filter out empty rows
-                initializeUsers(); // Update users based on new regions
+                }).filter(row => row !== null); // Remove null rows
+                console.log('Processed Data:', data); // Log full processed data
+                initializeUsers();
                 updateDashboard();
                 populateAutocomplete('Name of the Customer');
             } catch (error) {
                 console.error('Fetch error:', error);
                 document.getElementById('error-message').style.display = 'block';
                 document.getElementById('error-message').innerText = 'Error loading data: ' + error.message;
-                throw error; // Re-throw to be caught by login
+                throw error;
             }
         }
 
@@ -430,7 +416,7 @@
         }
 
         function computeMetrics(filteredData) {
-            console.log('Filtered Data:', filteredData); // Debug filtered data
+            console.log('Filtered Data for Metrics:', filteredData);
             const totalInvoiceValue = filteredData.reduce((sum, row) => sum + (row['Invoice Value'] || 0), 0);
             const totalOutstanding = filteredData.reduce((sum, row) => sum + (row['Amount Pending'] || 0), 0);
             const days60_90 = filteredData
@@ -450,6 +436,7 @@
             if (currentUser !== "ESHAK") {
                 filteredData = data.filter(row => row['Place'] === currentUser);
             }
+            console.log('Current User:', currentUser, 'Filtered Data:', filteredData);
 
             const metrics = computeMetrics(filteredData);
 
@@ -464,8 +451,8 @@
 
             const tableBody = document.getElementById('table-body');
             tableBody.innerHTML = '';
-            // Display individual rows without grouping by customer
-            filteredData.forEach(row => {
+            filteredData.forEach((row, index) => {
+                console.log(`Table Row ${index + 1}:`, row); // Log each row before display
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${row['S.No.'] || 'N/A'}</td>
