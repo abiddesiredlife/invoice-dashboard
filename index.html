@@ -277,9 +277,11 @@
         });
 
         document.getElementById('logout-btn').addEventListener('click', function() {
+            console.log('Logout clicked'); // Debug log
             loggedInRegion = null;
             document.getElementById('dashboard-section').style.display = 'none';
             document.getElementById('login-section').style.display = 'block';
+            document.getElementById('search-input').value = '';
         });
 
         document.querySelectorAll('input[name="search-type"]').forEach(radio => {
