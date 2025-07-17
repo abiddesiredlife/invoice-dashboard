@@ -190,7 +190,8 @@
             const totalOutstanding = filteredData.reduce((sum, row) => sum + row['Amount Pending'], 0);
             const days60_90 = filteredData.filter(row => row['DAYS OF INVOICE'] >= 60 && row['DAYS OF INVOICE'] < 90).reduce((sum, row) => sum + row['Amount Pending'], 0);
             const days90Plus = filteredData.filter(row => row['DAYS OF INVOICE'] >= 90).reduce((sum, row) => sum + row['Amount Pending'], 0);
-            return { totalInvoiceValue, totalOutstanding, days60_90, days90Plus };
+            const dso = totalInvoiceValue > 0 ? (totalOutstanding / (totalInvoiceValue / 365)) * 30 : 0;
+            return { totalInvoiceValue, totalOutstanding, days60_90, days90Plus, dso };
         }
 
         function updateDashboard() {
@@ -209,6 +210,7 @@
                 <div class="card"><h3>Total Outstanding</h3><p>Rs ${metrics.totalOutstanding.toFixed(2)}</p></div>
                 <div class="card"><h3>60-90 Days</h3><p>Rs ${metrics.days60_90.toFixed(2)}</p></div>
                 <div class="card" data-days="90+"><h3>90+ Days</h3><p>Rs ${metrics.days90Plus.toFixed(2)}</p></div>
+                <div class="card"><h3>DSO</h3><p>${metrics.dso.toFixed(2)} days</p></div>
             `;
             const tableBody = document.getElementById('table-body');
             tableBody.innerHTML = '';
@@ -255,44 +257,46 @@
             document.getElementById('new-password').value = '';
         }
 
-        document.getElementById('login-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value;
-            const region = regionList.find(r => r.toLowerCase() === username.toLowerCase());
-            if (!region) {
-                document.getElementById('login-error').innerText = 'Invalid region.';
-                return;
-            }
-            ensureRegionRegistered(region);
-            if (getRegionPasswords()[region.toLowerCase()] !== password) {
-                document.getElementById('login-error').innerText = 'Incorrect password.';
-                return;
-            }
-            loggedInRegion = region;
-            document.getElementById('login-section').style.display = 'none';
-            document.getElementById('dashboard-section').style.display = '';
-            document.getElementById('login-error').innerText = '';
-            updateDashboard();
-        });
-
-        document.getElementById('logout-btn').addEventListener('click', function() {
-            console.log('Logout clicked'); // Debug log
-            loggedInRegion = null;
-            document.getElementById('dashboard-section').style.display = 'none';
-            document.getElementById('login-section').style.display = 'block';
-            document.getElementById('search-input').value = '';
-        });
-
-        document.querySelectorAll('input[name="search-type"]').forEach(radio => {
-            radio.addEventListener('change', function() {
-                document.getElementById('search-input').value = '';
-                populateAutocomplete();
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('login-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const username = document.getElementById('username').value.trim();
+                const password = document.getElementById('password').value;
+                const region = regionList.find(r => r.toLowerCase() === username.toLowerCase());
+                if (!region) {
+                    document.getElementById('login-error').innerText = 'Invalid region.';
+                    return;
+                }
+                ensureRegionRegistered(region);
+                if (getRegionPasswords()[region.toLowerCase()] !== password) {
+                    document.getElementById('login-error').innerText = 'Incorrect password.';
+                    return;
+                }
+                loggedInRegion = region;
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('dashboard-section').style.display = '';
+                document.getElementById('login-error').innerText = '';
                 updateDashboard();
             });
-        });
 
-        document.getElementById('search-input').addEventListener('input', updateDashboard);
+            document.getElementById('logout-btn').addEventListener('click', function() {
+                console.log('Logout clicked'); // Debug log
+                loggedInRegion = null;
+                document.getElementById('dashboard-section').style.display = 'none';
+                document.getElementById('login-section').style.display = 'block';
+                document.getElementById('search-input').value = '';
+            });
+
+            document.querySelectorAll('input[name="search-type"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    document.getElementById('search-input').value = '';
+                    populateAutocomplete();
+                    updateDashboard();
+                });
+            });
+
+            document.getElementById('search-input').addEventListener('input', updateDashboard);
+        });
 
         fetchData();
         setInterval(fetchData, 60000);
