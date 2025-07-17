@@ -34,9 +34,10 @@
         }
         #admin-panel { display:none; margin:16px auto 30px auto; background: #fcf9ed; text-align:left; width:80vw; max-width:700px; border-radius:8px; box-shadow:0 0 8px #eee; padding:18px 25px;}
         #admin-panel table { width:100%;}
-        #admin-panel input[type="password"], #admin-panel input[type="text"] { width:110px;}
-        #admin-panel button { min-width:60px;}
+        #admin-panel input[type="password"], #admin-panel input[type="text"] { width:150px;}
+        #admin-panel button { min-width:80px; margin-left:10px;}
         .password-row-updated { background: #c3ebc8!important; transition: background 0.6s;}
+        .update-block { margin: 10px 0; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -59,11 +60,16 @@
         </div>
         <div id="error-message"></div>
         <div id="admin-panel" style="display:none;">
-            <h3>Admin: Update Password for All Regions</h3>
-            <p>Enter new password to apply to all regions:</p>
-            <input type="password" id="global-password-input" style="width:200px; padding:5px;">
-            <button onclick="updateAllPasswords()" style="margin-left:10px;">Update All</button>
-            <div id="update-status" style="color:green; margin-top:10px;"></div>
+            <h3>Admin: Update Passwords for All Regions</h3>
+            <div class="update-block">
+                <p>Update passwords for all regions below (admin "eshak" only):</p>
+                <table id="password-table">
+                    <thead><tr><th>Region</th><th>New Password</th><th>Action</th></tr></thead>
+                    <tbody id="password-tbody"></tbody>
+                </table>
+                <button onclick="updateAllPasswords()" style="margin-top:10px;">Apply to All Regions</button>
+                <div id="update-status" style="color:green; margin-top:10px;"></div>
+            </div>
         </div>
         <div class="search-container" id="search-container">
             <label>Search By:</label>
@@ -94,7 +100,7 @@
             <tbody id="table-body"></tbody>
         </table>
     </div>
-<script>
+    <script>
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrtlUIgWw1mxcwNTm_e_YkfW_cr0tmPM4o0S2wHdLQ3Gv4NgfPOwp_kv1pTAIZ1Q/pub?output=csv";
 const getSheetURL = () => SHEET_URL + "&t=" + Date.now();
 let data = [];
@@ -290,9 +296,49 @@ function updateDashboard() {
         && loggedInRegion.trim().toLowerCase() === 'eshak'
     ) {
         document.getElementById('admin-panel').style.display = '';
+        showAdminPanel();
     } else {
         document.getElementById('admin-panel').style.display = 'none';
     }
+}
+
+function showAdminPanel() {
+    const tbody = document.getElementById('password-tbody');
+    tbody.innerHTML = '';
+    const passwords = getRegionPasswords();
+    regionList.forEach(region => {
+        const key = region.trim().toLowerCase();
+        const currentPassword = passwords[key] || '12345678';
+        const inputId = `pwd_${key.replace(/[^a-z0-9]/gi, '_')}`;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${region}</td>
+            <td><input type="password" id="${inputId}" value="${currentPassword}" style="width:150px;"></td>
+            <td><button onclick="updatePassword('${region}', '${inputId}', this)">Update</button></td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function updatePassword(region, inputId, btn) {
+    if (loggedInRegion && loggedInRegion.trim().toLowerCase() !== 'eshak') {
+        document.getElementById('update-status').innerText = 'Only admin (eshak) can update passwords.';
+        document.getElementById('update-status').style.color = 'red';
+        return;
+    }
+    const newPassword = document.getElementById(inputId).value.trim();
+    if (!newPassword) {
+        document.getElementById('update-status').innerText = 'Password cannot be blank.';
+        document.getElementById('update-status').style.color = 'red';
+        return;
+    }
+    const passwords = getRegionPasswords();
+    passwords[region.trim().toLowerCase()] = newPassword;
+    saveRegionPasswords(passwords);
+    btn.closest('tr').classList.add('password-row-updated');
+    setTimeout(() => btn.closest('tr').classList.remove('password-row-updated'), 1300);
+    document.getElementById('update-status').innerText = `Password updated for ${region}.`;
+    document.getElementById('update-status').style.color = 'green';
 }
 
 function updateAllPasswords() {
@@ -301,18 +347,26 @@ function updateAllPasswords() {
         document.getElementById('update-status').style.color = 'red';
         return;
     }
-    const newPassword = document.getElementById('global-password-input').value.trim();
-    if (!newPassword) {
-        document.getElementById('update-status').innerText = 'Password cannot be blank.';
+    const inputs = document.querySelectorAll('#password-tbody input[type="password"]');
+    const passwords = getRegionPasswords();
+    let allUpdated = true;
+    inputs.forEach(input => {
+        const newPassword = input.value.trim();
+        const region = input.closest('tr').querySelector('td:first-child').innerText;
+        if (!newPassword) {
+            allUpdated = false;
+            return;
+        }
+        passwords[region.trim().toLowerCase()] = newPassword;
+    });
+    if (!allUpdated) {
+        document.getElementById('update-status').innerText = 'All passwords must be filled.';
         document.getElementById('update-status').style.color = 'red';
         return;
     }
-    const passwords = getRegionPasswords();
-    regionList.forEach(region => {
-        passwords[region.trim().toLowerCase()] = newPassword;
-    });
     saveRegionPasswords(passwords);
-    document.getElementById('global-password-input').value = '';
+    document.querySelectorAll('#password-tbody tr').forEach(row => row.classList.add('password-row-updated'));
+    setTimeout(() => document.querySelectorAll('#password-tbody tr').forEach(row => row.classList.remove('password-row-updated')), 1300);
     document.getElementById('update-status').innerText = 'Passwords updated for all regions.';
     document.getElementById('update-status').style.color = 'green';
 }
