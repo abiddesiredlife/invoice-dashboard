@@ -1,245 +1,493 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Customer Invoice Dashboard</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    h1, h2 { text-align: center; }
-    .hidden { display: none; }
-    .login-box, .dashboard { max-width: 600px; margin: auto; }
-    input[type="text"], input[type="password"], select {
-      width: 100%; padding: 8px; margin-top: 10px;
-    }
-    button { padding: 10px 20px; margin-top: 10px; }
-    .autocomplete-suggestions {
-      background: #f1f1f1; border: 1px solid #ccc;
-      max-height: 150px; overflow-y: auto; margin-top: 5px;
-    }
-    .autocomplete-suggestions div {
-      padding: 5px; cursor: pointer;
-    }
-    .autocomplete-suggestions div:hover {
-      background: #ddd;
-    }
-    table, th, td {
-      border: 1px solid #aaa; border-collapse: collapse;
-      padding: 8px; text-align: left; margin-top: 20px; width: 100%;
-    }
-    th { background-color: #eee; }
-    .admin-panel { margin-top: 30px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Olive OS Invoice Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f9;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+        }
+        .search-container {
+            margin: 20px 0;
+            position: relative;
+        }
+        .search-container label {
+            font-size: 18px;
+            margin-right: 10px;
+        }
+        .search-container input[type="radio"] {
+            margin: 0 5px;
+        }
+        #search-input {
+            width: 50%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        #autocomplete-list {
+            position: absolute;
+            width: 50%;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            z-index: 1000;
+            display: none;
+        }
+        #autocomplete-list div {
+            padding: 10px;
+            cursor: pointer;
+        }
+        #autocomplete-list div:hover {
+            background-color: #f0f0f0;
+        }
+        .card-container {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .card {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin: 10px;
+            width: 18%;
+            min-width: 150px;
+            text-align: center;
+            word-wrap: break-word;
+        }
+        .card h3 {
+            margin: 0 0 10px;
+            font-size: 18px;
+        }
+        .card p {
+            margin: 0;
+            font-size: 24px;
+            font-weight: bold;
+            overflow: hidden;
+        }
+        .card[data-days="90+"] {
+            background-color: #8B0000;
+            color: white;
+        }
+        table {
+            border-collapse: collapse;
+            width: 80%;
+            margin: 20px auto;
+            background-color: white;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        canvas {
+            max-width: 80%;
+            margin: 20px auto;
+        }
+        #error-message {
+            color: red;
+            margin: 20px;
+            display: none;
+        }
+        @media (max-width: 768px) {
+            .card {
+                width: 45%;
+            }
+            #search-input, #autocomplete-list {
+                width: 80%;
+            }
+            table, canvas {
+                width: 95%;
+            }
+        }
+        #admin-panel {
+            display: none;
+            margin: 20px;
+            text-align: left;
+            width: 80vw;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        #admin-panel table {
+            width: 100%;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <h1>Customer Invoice Dashboard</h1>
-
-  <div class="login-box" id="login-box">
-    <h3>Login</h3>
-    <input type="text" id="username" placeholder="Region name (e.g., hyderabad)" />
-    <input type="password" id="password" placeholder="Password" />
-    <button onclick="login()">Login</button>
-    <p id="login-error" style="color: red;"></p>
-  </div>
-
-  <div id="dashboard" class="dashboard hidden">
-    <p><strong>Welcome:</strong> <span id="user-role"></span></p>
-
-    <div class="search-section">
-      <label><input type="radio" name="search-type" value="Place" checked /> Region</label>
-      <label><input type="radio" name="search-type" value="Name of the Customer" /> Customer</label>
-      <input type="text" id="search-input" placeholder="Search..." />
-      <div id="autocomplete" class="autocomplete-suggestions"></div>
+    <!-- LOGIN SECTION -->
+    <div id="login-section" style="display: block;">
+        <h2>Login to Olive OS Invoice Dashboard</h2>
+        <form id="login-form" style="display: inline-block; margin: auto; text-align: left;">
+            <label for="username">Region Name (Place):</label><br>
+            <input type="text" id="username" required style="width: 250px;"><br>
+            <label for="password">Password:</label><br>
+            <input type="password" id="password" required style="width: 250px;"><br>
+            <button type="submit" style="width: 250px; margin-top: 10px;">Login</button>
+            <div id="login-error" style="color: red; margin-top: 10px;"></div>
+        </form>
     </div>
 
-    <div class="metrics">
-      <p><strong>Total Invoice Value:</strong> ₹<span id="total-invoice">0</span></p>
-      <p><strong>Total Outstanding:</strong> ₹<span id="total-outstanding">0</span></p>
+    <!-- DASHBOARD SECTION (hidden before login) -->
+    <div id="dashboard-section" style="display: none;">
+        <h1>Olive OS Invoice Dashboard</h1>
+        <div style="text-align: right; margin-bottom: 10px;">
+            <button id="logout-btn" style="display:inline-block;">Logout</button>
+        </div>
+        <div id="error-message"></div>
+
+        <!-- ADMIN PANEL -->
+        <div id="admin-panel">
+            <h3>Admin: Change Region Passwords</h3>
+            <table>
+                <thead><tr><th>Region (Place)</th><th>Password</th><th>Action</th></tr></thead>
+                <tbody id="password-table"></tbody>
+            </table>
+        </div>
+
+        <div class="search-container">
+            <label>Search By:</label>
+            <input type="radio" name="search-type" value="Name of the Customer" id="customer-radio" checked>
+            <label for="customer-radio">Customer</label>
+            <input type="radio" name="search-type" value="Place" id="region-radio">
+            <label for="region-radio">Region</label>
+            <br>
+            <input type="text" id="search-input" placeholder="Start typing to search...">
+            <div id="autocomplete-list"></div>
+        </div>
+        <div class="card-container" id="kpi-cards"></div>
+        <canvas id="days-chart"></canvas>
+        <table id="data-table">
+            <thead>
+                <tr>
+                    <th>S.No.</th>
+                    <th>Name of the Customer</th>
+                    <th>Place</th>
+                    <th>Inv. No.</th>
+                    <th>Inv. Date</th>
+                    <th>DAYS OF INVOICE</th>
+                    <th>Invoice Value</th>
+                    <th>Amount Pending</th>
+                    <th>STATUS</th>
+                </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+        </table>
     </div>
+    <script>
+        const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrtlUIgWw1mxcwNTm_e_YkfW_cr0tmPM4o0S2wHdLQ3Gv4NgfPOwp_kv1pTAIZ1Q/pub?output=csv";
+        let data = [];
+        let chartInstance = null;
+        let regionList = []; // List of region names found in Place column
+        let loggedInRegion = null; // The region (Place) currently logged-in
 
-    <table id="data-table">
-      <thead>
-        <tr>
-          <th>Customer</th>
-          <th>Region</th>
-          <th>Invoice Value</th>
-          <th>Outstanding</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-
-    <div id="admin-panel" class="admin-panel hidden">
-      <h2>🔧 Admin: Manage Region Passwords</h2>
-      <select id="region-selector"></select>
-      <input type="text" id="new-password" placeholder="New Password" />
-      <button onclick="updatePassword()">Update Password</button>
-      <p id="admin-msg" style="color: green;"></p>
-    </div>
-  </div>
-
-  <script>
-    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSR58lwdxbah0w6oeokmaT1MuOciAyhMFJoIwD-2YsPJeU5XOA6BF7EdAgej4tQz73_Ub_XpUuip4HZ/pub?output=csv';
-    let rawData = [];
-    let user = null;
-    const defaultPassword = '12345678';
-    let regionPasswords = {};
-
-    async function fetchCSV() {
-      const res = await fetch(CSV_URL);
-      const text = await res.text();
-      parseCSV(text);
-    }
-
-    function parseCSV(csv) {
-      const lines = csv.trim().split('\n');
-      const headers = lines[0].split(',').map(h => h.trim());
-      rawData = lines.slice(1).map(line => {
-        const values = line.split(',').map(v => v.trim());
-        const row = {};
-        headers.forEach((h, i) => row[h] = values[i]);
-        row['Invoice Value'] = parseFloat(row['Invoice Value']) || 0;
-        row['Outstanding'] = parseFloat(row['Outstanding']) || 0;
-        row['Place'] = row['Place'].trim();
-        row['Name of the Customer'] = row['Name of the Customer'].trim();
-        row['Password'] = row['Password'] || defaultPassword;
-        return row;
-      });
-
-      regionPasswords = {};
-      rawData.forEach(row => {
-        const region = row['Place'].toLowerCase();
-        regionPasswords[region] = row['Password'] || defaultPassword;
-      });
-
-      setupAfterLogin();
-    }
-
-    function login() {
-      const username = document.getElementById('username').value.trim().toLowerCase();
-      const password = document.getElementById('password').value.trim();
-
-      if (regionPasswords[username] && regionPasswords[username] === password) {
-        user = { region: username };
-        document.getElementById('login-box').classList.add('hidden');
-        document.getElementById('dashboard').classList.remove('hidden');
-        document.getElementById('user-role').textContent = username === 'eshak' ? 'Admin (Eshak)' : username;
-        fetchCSV();
-        if (username === 'eshak') {
-          document.getElementById('admin-panel').classList.remove('hidden');
+        // --- Password Storage Functions using localStorage ---
+        function getRegionPasswords() {
+            try {
+                const out = JSON.parse(localStorage.getItem('region_passwords') || '{}');
+                if (typeof out === 'object' && out !== null) return out;
+            } catch (e) {}
+            return {};
         }
-      } else {
-        document.getElementById('login-error').textContent = 'Invalid login. Please check region name and password.';
-      }
-    }
+        function saveRegionPasswords(passwords) {
+            localStorage.setItem('region_passwords', JSON.stringify(passwords));
+        }
+        function ensureRegionRegistered(region) {
+            // Register place in passwords/localStorage if doesn't exist, with default password
+            const passwords = getRegionPasswords();
+            if (!(region.trim().toLowerCase() in passwords)) {
+                passwords[region.trim().toLowerCase()] = "12345678";
+                saveRegionPasswords(passwords);
+            }
+        }
 
-    function setupAfterLogin() {
-      updateAutocomplete();
-      updateDashboard();
+        // --- Fetch Data and Parse regions ---
+        async function fetchData() {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                const text = await response.text();
+                const rows = text.split('\n').map(row => row.split(',').map(cell => cell.trim()));
+                const headers = rows[0].map(header => header.trim().toLowerCase());
+                data = rows.slice(1).filter(row => row.length >= headers.length).map(row => {
+                    let obj = {};
+                    headers.forEach((header, i) => {
+                        const normalizedHeader = header.replace(/\s+/g, ' ').trim().toLowerCase();
+                        const value = row[i] !== undefined ? row[i].trim() : 'N/A';
+                        obj[normalizedHeader === 'name of the customer' ? 'Name of the Customer' : 
+                            normalizedHeader === 'place' ? 'Place' : 
+                            normalizedHeader === 'inv. no.' ? 'Inv. No.' : 
+                            normalizedHeader === 'inv. date' ? 'Inv. Date' : 
+                            normalizedHeader === 's.no.' ? 'S.No.' : 
+                            normalizedHeader === 'invoice value' ? 'Invoice Value' : 
+                            normalizedHeader === 'amount pending' ? 'Amount Pending' : 
+                            normalizedHeader === 'days of invoice' ? 'DAYS OF INVOICE' : 
+                            normalizedHeader === 'status' ? 'STATUS' : 
+                            normalizedHeader] = value;
+                    });
+                    obj['DAYS OF INVOICE'] = parseFloat((obj['DAYS OF INVOICE'] || '').replace(/[^0-9.-]+/g, '') || 0);
+                    obj['Invoice Value'] = parseFloat((obj['Invoice Value'] || '').replace(/[₹Rs$,]/gi, '').replace(/,/g, '').replace(/\s/g, '') || 0);
+                    obj['Amount Pending'] = parseFloat((obj['Amount Pending'] || '').replace(/[₹Rs$,]/gi, '').replace(/,/g, '').replace(/\s/g, '') || 0);
+                    return obj;
+                });
 
-      if (user.region === 'eshak') {
-        const regions = [...new Set(rawData.map(r => r['Place'].trim()))];
-        const selector = document.getElementById('region-selector');
-        selector.innerHTML = '';
-        regions.forEach(region => {
-          const opt = document.createElement('option');
-          opt.value = region;
-          opt.textContent = region;
-          selector.appendChild(opt);
-        });
-      }
-    }
+                regionList = [...new Set(data.map(row => row['Place']).map(x=>x && x.trim()).filter(val => !!val && val !== 'N/A'))];
+                // For each region, ensure password is registered with default
+                regionList.forEach(ensureRegionRegistered);
 
-    function filteredRows() {
-      return rawData.filter(row => {
-        if (user.region === 'eshak') return true;
-        return row['Place'].toLowerCase() === user.region;
-      });
-    }
+                // If already logged in (after refresh), keep session
+                if (loggedInRegion) {
+                    document.getElementById('login-section').style.display = 'none';
+                    document.getElementById('dashboard-section').style.display = '';
+                    updateDashboard();
+                }
+                
+                // Populate autocomplete only for customer by default (since region will be hidden for non-admins)
+                populateAutocomplete('Name of the Customer');
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                document.getElementById('error-message').style.display = 'block';
+                document.getElementById('error-message').innerText = 'Error loading data: ' + error.message;
+            }
+        }
 
-    function updateAutocomplete() {
-      const searchType = document.querySelector('input[name="search-type"]:checked').value;
-      const suggestions = [...new Set(filteredRows().map(r => r[searchType]))];
-      const container = document.getElementById('autocomplete');
-      container.innerHTML = '';
-      suggestions.forEach(val => {
-        const div = document.createElement('div');
-        div.textContent = val;
-        div.onclick = () => {
-          document.getElementById('search-input').value = val;
-          updateDashboard();
+        // --- Autocomplete for Search ---
+        function populateAutocomplete(searchType) {
+            const input = document.getElementById('search-input');
+            const list = document.getElementById('autocomplete-list');
+            list.innerHTML = '';
+            // Filter data for current logged-in region user
+            let ds = data;
+            if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak') {
+                ds = data.filter(row => row['Place'] && row['Place'].trim().toLowerCase() === loggedInRegion.toLowerCase());
+            }
+            const uniqueValues = [...new Set(ds.map(row => row[searchType]))]
+                .filter(val => val && val.trim() !== '')
+                .sort();
+            input.addEventListener('input', function() {
+                const query = input.value.trim().toLowerCase();
+                list.innerHTML = '';
+                if (query) {
+                    const matches = uniqueValues.filter(val => val.toLowerCase().includes(query));
+                    matches.forEach(val => {
+                        const div = document.createElement('div');
+                        div.innerText = val;
+                        div.addEventListener('click', () => {
+                            input.value = val;
+                            list.innerHTML = '';
+                            list.style.display = 'none';
+                            updateDashboard();
+                        });
+                        list.appendChild(div);
+                    });
+                    list.style.display = matches.length ? 'block' : 'none';
+                } else {
+                    list.style.display = 'none';
+                }
+            });
+        }
+
+        // --- Metrics ---
+        function computeMetrics(filteredData) {
+            const totalInvoiceValue = filteredData.reduce((sum, row) => sum + row['Invoice Value'], 0);
+            const totalOutstanding = filteredData.reduce((sum, row) => sum + row['Amount Pending'], 0);
+            const days60_90 = filteredData
+                .filter(row => row['DAYS OF INVOICE'] >= 60 && row['DAYS OF INVOICE'] < 90)
+                .reduce((sum, row) => sum + row['Amount Pending'], 0);
+            const days90Plus = filteredData
+                .filter(row => row['DAYS OF INVOICE'] >= 90)
+                .reduce((sum, row) => sum + row['Amount Pending'], 0);
+            const totalReceivables = data.reduce((sum, row) => sum + row['Amount Pending'], 0);
+            const totalCreditSales = data.reduce((sum, row) => sum + row['Invoice Value'], 0);
+            const dso = totalCreditSales > 0 ? (totalReceivables / totalCreditSales) * 365 : 0;
+            return { totalInvoiceValue, totalOutstanding, days60_90, days90Plus, dso };
+        }
+
+        // --- DASHBOARD UPDATE MAIN LOGIC ---
+        function updateDashboard() {
+            if (!data || !data.length) return;
+            let searchType = document.querySelector('input[name="search-type"]:checked')?.value || 'Name of the Customer';
+            let searchValue = document.getElementById('search-input').value.trim();
+            let filteredData;
+
+            if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak') {
+                filteredData = data.filter(row => (row['Place']||'').trim().toLowerCase() === loggedInRegion.toLowerCase());
+                // Hide region search for normal users
+                document.getElementById('region-radio').parentElement.style.display = 'none';
+            } else {
+                // admin
+                filteredData = data;
+                document.getElementById('region-radio').parentElement.style.display = '';
+            }
+            if (searchValue) {
+                filteredData = filteredData.filter(row => (row[searchType]||'') === searchValue);
+            }
+            const metrics = computeMetrics(filteredData);
+
+            // KPI Cards
+            document.getElementById('kpi-cards').innerHTML = `
+                <div class="card"><h3>Total Invoice Value</h3><p>Rs ${metrics.totalInvoiceValue.toFixed(2)}</p></div>
+                <div class="card"><h3>Total Outstanding</h3><p>Rs ${metrics.totalOutstanding.toFixed(2)}</p></div>
+                <div class="card"><h3>60-90 Days</h3><p>Rs ${metrics.days60_90.toFixed(2)}</p></div>
+                <div class="card" data-days="90+"><h3>90+ Days</h3><p>Rs ${metrics.days90Plus.toFixed(2)}</p></div>
+                <div class="card"><h3>DSO (Annual)</h3><p>${metrics.dso.toFixed(2)} days</p></div>
+            `;
+
+            // Table
+            const tableBody = document.getElementById('table-body');
+            tableBody.innerHTML = '';
+            filteredData.slice(0, 10).forEach((row) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row['S.No.'] || 'N/A'}</td>
+                    <td>${row['Name of the Customer'] || 'N/A'}</td>
+                    <td>${row['Place'] || 'N/A'}</td>
+                    <td>${row['Inv. No.'] || 'N/A'}</td>
+                    <td>${row['Inv. Date'] || 'N/A'}</td>
+                    <td>${row['DAYS OF INVOICE'] !== undefined ? row['DAYS OF INVOICE'] : 'N/A'}</td>
+                    <td>Rs ${row['Invoice Value'].toFixed(2)}</td>
+                    <td>Rs ${row['Amount Pending'].toFixed(2)}</td>
+                    <td>${row['STATUS'] || 'N/A'}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+            // Chart
+            if (chartInstance) chartInstance.destroy();
+            const daysSummary = {
+                '<60 Days': filteredData.filter(row => row['DAYS OF INVOICE'] < 60).reduce((sum, row) => sum + row['Amount Pending'], 0),
+                '60-90 Days': metrics.days60_90,
+                '90+ Days': metrics.days90Plus
+            };
+            chartInstance = new Chart(document.getElementById('days-chart'), {
+                type: 'bar',
+                data: {
+                    labels: ['<60 Days', '60-90 Days', '90+ Days'],
+                    datasets: [{
+                        label: 'Outstanding Amount (Rs)',
+                        data: [daysSummary['<60 Days'], daysSummary['60-90 Days'], daysSummary['90+ Days']],
+                        backgroundColor: ['#36A2EB', '#FFCE56', '#8B0000']
+                    }]
+                },
+                options: {
+                    plugins: { title: { display: true, text: 'Outstanding by Days Category' } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+
+            // Show admin panel only for admin
+            if (loggedInRegion && loggedInRegion.toLowerCase() === 'eshak') {
+                document.getElementById('admin-panel').style.display = '';
+                showAdminPanel();
+            } else {
+                document.getElementById('admin-panel').style.display = 'none';
+            }
+        }
+
+        // --- ADMIN PANEL ---
+        function showAdminPanel() {
+            const table = document.getElementById('password-table');
+            table.innerHTML = '';
+            const passwords = getRegionPasswords();
+            for (const region of regionList) {
+                const pwd = passwords[region.trim().toLowerCase()] || '12345678';
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${region}</td>
+                    <td><input type="password" value="${pwd}" id="pwd_${region}" style="width:120px"></td>
+                    <td><button onclick="updatePassword('${region}')">Update</button></td>`;
+                table.appendChild(row);
+            }
+        }
+        window.updatePassword = function(region) {
+            const newpwd = document.getElementById('pwd_' + region).value;
+            if (!newpwd) {
+                alert("Password cannot be blank.");
+                return;
+            }
+            const passwords = getRegionPasswords();
+            passwords[region.trim().toLowerCase()] = newpwd;
+            saveRegionPasswords(passwords);
+            alert("Password updated for " + region);
         };
-        container.appendChild(div);
-      });
-    }
 
-    function updateDashboard() {
-      const type = document.querySelector('input[name="search-type"]:checked').value;
-      const value = document.getElementById('search-input').value.trim().toLowerCase();
+        // --- LOGIN LOGIC ---
+        document.getElementById('login-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const usernameInput = document.getElementById('username').value.trim();
+            const passwordInput = document.getElementById('password').value;
+            if(!usernameInput || !passwordInput) return;
+            // Username must match an available region (case-insensitive)
+            const enteredRegion = regionList.find(
+                reg => reg.trim().toLowerCase() === usernameInput.toLowerCase()
+            );
+            if(!enteredRegion) {
+                document.getElementById('login-error').innerText = "Invalid region (Place) name.";
+                return;
+            }
+            ensureRegionRegistered(enteredRegion);
+            const pwdStore = getRegionPasswords();
+            if (pwdStore[enteredRegion.trim().toLowerCase()] !== passwordInput) {
+                document.getElementById('login-error').innerText = "Incorrect password.";
+                return;
+            }
+            // Passed authentication
+            loggedInRegion = enteredRegion.trim();
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('dashboard-section').style.display = '';
+            document.getElementById('login-error').innerText = '';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            updateDashboard();
+            // Re-initialize autocomplete for current user's scope
+            if(loggedInRegion.toLowerCase() === "eshak"){
+                document.getElementById('region-radio').parentElement.style.display = '';
+            } else {
+                document.getElementById('region-radio').parentElement.style.display = 'none';
+            }
+            populateAutocomplete('Name of the Customer');
+        });
 
-      const rows = filteredRows().filter(row =>
-        !value || row[type].toLowerCase() === value
-      );
+        // --- LOGOUT ---
+        document.getElementById('logout-btn').addEventListener('click', function() {
+            loggedInRegion = null;
+            document.getElementById('dashboard-section').style.display = 'none';
+            document.getElementById('login-section').style.display = 'block';
+        });
 
-      const totalInv = rows.reduce((sum, r) => sum + r['Invoice Value'], 0);
-      const totalOut = rows.reduce((sum, r) => sum + r['Outstanding'], 0);
+        // --- SEARCH BEHAVIOR ---
+        document.querySelectorAll('input[name="search-type"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                document.getElementById('search-input').value = '';
+                populateAutocomplete(radio.value);
+                updateDashboard();
+            });
+        });
+        document.getElementById('search-input').addEventListener('input', function() {
+            updateDashboard();
+        });
 
-      document.getElementById('total-invoice').textContent = totalInv.toFixed(2);
-      document.getElementById('total-outstanding').textContent = totalOut.toFixed(2);
+        // --- ON LOAD INIT ---
+        fetchData();
+        setInterval(fetchData, 60000);
 
-      const tbody = document.querySelector('#data-table tbody');
-      tbody.innerHTML = '';
-      if (rows.length === 0) {
-        const tr = document.createElement('tr');
-        const td = document.createElement('td');
-        td.colSpan = 4;
-        td.textContent = 'No matching data found.';
-        tr.appendChild(td);
-        tbody.appendChild(tr);
-        return;
-      }
-
-      rows.forEach(r => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${r['Name of the Customer']}</td>
-          <td>${r['Place']}</td>
-          <td>₹${r['Invoice Value'].toFixed(2)}</td>
-          <td>₹${r['Outstanding'].toFixed(2)}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function updatePassword() {
-      const region = document.getElementById('region-selector').value.trim().toLowerCase();
-      const newPassword = document.getElementById('new-password').value.trim();
-
-      if (!newPassword) {
-        document.getElementById('admin-msg').textContent = 'Please enter a new password.';
-        return;
-      }
-
-      regionPasswords[region] = newPassword;
-
-      rawData.forEach(row => {
-        if (row['Place'].trim().toLowerCase() === region) {
-          row['Password'] = newPassword;
-        }
-      });
-
-      document.getElementById('admin-msg').textContent = `Password for "${region}" updated successfully.`;
-      document.getElementById('new-password').value = '';
-    }
-
-    document.querySelectorAll('input[name="search-type"]').forEach(radio => {
-      radio.addEventListener('change', () => {
-        updateAutocomplete();
-        updateDashboard();
-      });
-    });
-
-    document.getElementById('search-input').addEventListener('input', updateDashboard);
-  </script>
+    </script>
 </body>
 </html>
