@@ -113,15 +113,27 @@
         }
         #admin-panel {
             display: none;
-            margin: 20px;
+            margin: 20px auto;
+            background: #fcf9ed;
             text-align: left;
             width: 80vw;
             max-width: 700px;
-            margin-left: auto;
-            margin-right: auto;
+            border-radius: 8px;
+            box-shadow: 0 0 8px #eee;
+            padding: 18px 25px;
         }
         #admin-panel table {
             width: 100%;
+        }
+        #admin-panel input[type="password"], #admin-panel input[type="text"] {
+            width: 110px;
+        }
+        #admin-panel button {
+            min-width: 60px;
+        }
+        .password-row-updated {
+            background: #c3ebc8 !important;
+            transition: background 0.6s;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -130,11 +142,11 @@
     <!-- LOGIN SECTION -->
     <div id="login-section" style="display: block;">
         <h2>Login to Olive OS Invoice Dashboard</h2>
-        <form id="login-form" style="display: inline-block; margin: auto; text-align: left;">
+        <form id="login-form" autocomplete="on" style="display: inline-block; margin: auto; text-align: left;">
             <label for="username">Region Name (Place):</label><br>
-            <input type="text" id="username" required style="width: 250px;"><br>
+            <input type="text" id="username" name="username" autocomplete="username" required style="width: 250px;"><br>
             <label for="password">Password:</label><br>
-            <input type="password" id="password" required style="width: 250px;"><br>
+            <input type="password" id="password" name="password" autocomplete="current-password" required style="width: 250px;"><br>
             <button type="submit" style="width: 250px; margin-top: 10px;">Login</button>
             <div id="login-error" style="color: red; margin-top: 10px;"></div>
         </form>
@@ -157,7 +169,7 @@
             </table>
         </div>
 
-        <!-- SEARCH CONTAINER: Always show "customer" search for all roles -->
+        <!-- SEARCH CONTAINER: Always show customer search for all roles -->
         <div class="search-container" id="search-container">
             <label>Search By:</label>
             <input type="radio" name="search-type" value="Name of the Customer" id="customer-radio" checked>
@@ -165,7 +177,7 @@
             <input type="radio" name="search-type" value="Place" id="region-radio">
             <label for="region-radio" id="region-label">Region</label>
             <br>
-            <input type="text" id="search-input" placeholder="Start typing to search...">
+            <input type="text" id="search-input" autocomplete="off" placeholder="Start typing to search...">
             <div id="autocomplete-list"></div>
         </div>
 
@@ -195,7 +207,6 @@ let chartInstance = null;
 let regionList = [];
 let loggedInRegion = null;
 
-
 function getRegionPasswords() {
     try {
         const out = JSON.parse(localStorage.getItem('region_passwords') || '{}');
@@ -214,7 +225,6 @@ function ensureRegionRegistered(region) {
     }
 }
 
-// Fetch data and register regions for login/passwords
 async function fetchData() {
     try {
         const response = await fetch(url);
@@ -246,13 +256,11 @@ async function fetchData() {
         regionList = [...new Set(data.map(row => row['Place']).map(x=>x && x.trim()).filter(val => !!val && val !== 'N/A'))];
         regionList.forEach(ensureRegionRegistered);
 
-        // If already logged in after reload
         if (loggedInRegion) {
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('dashboard-section').style.display = '';
             updateDashboard();
         }
-        // Always allow autocomplete for customer for all roles
         populateAutocomplete('Name of the Customer');
     } catch (error) {
         console.error('Error fetching data:', error);
@@ -261,21 +269,16 @@ async function fetchData() {
     }
 }
 
-// Autocomplete for the given field; only customers from that user's region
 function populateAutocomplete(searchType) {
     const input = document.getElementById('search-input');
     const list = document.getElementById('autocomplete-list');
     list.innerHTML = '';
-    // Limit dataset to allowed view
     let ds = data;
     if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak' && searchType === 'Name of the Customer') {
         ds = data.filter(row => row['Place'] && row['Place'].trim().toLowerCase() === loggedInRegion.toLowerCase());
-    }
-    else if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak' && searchType === 'Place') {
-        // User is not admin, but selects region search (defensively). Should only have the one region available!
+    } else if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak' && searchType === 'Place') {
         ds = data.filter(row => row['Place'] && row['Place'].trim().toLowerCase() === loggedInRegion.toLowerCase());
     }
-    // Otherwise: admin or not logged in - gets all available
     const uniqueValues = [...new Set(ds.map(row => row[searchType]))]
         .filter(val => val && val.trim() !== '')
         .sort();
@@ -302,7 +305,6 @@ function populateAutocomplete(searchType) {
     };
 }
 
-// KPI/Metrics
 function computeMetrics(filteredData) {
     const totalInvoiceValue = filteredData.reduce((sum, row) => sum + row['Invoice Value'], 0);
     const totalOutstanding = filteredData.reduce((sum, row) => sum + row['Amount Pending'], 0);
@@ -323,25 +325,21 @@ function updateDashboard() {
     let searchType = document.querySelector('input[name="search-type"]:checked')?.value || 'Name of the Customer';
     let searchValue = document.getElementById('search-input').value.trim();
     let filteredData;
-    // Region Users: Only their region's data
+
     if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak') {
         filteredData = data.filter(row => (row['Place']||'').trim().toLowerCase() === loggedInRegion.toLowerCase());
-        // Hide region option/search for them
         document.getElementById('region-radio').style.display = 'none';
         document.getElementById('region-label').style.display = 'none';
     } else {
-        // Admin can search by Place
         filteredData = data;
         document.getElementById('region-radio').style.display = '';
         document.getElementById('region-label').style.display = '';
     }
-    // Still use search box filter
     if (searchValue) {
         filteredData = filteredData.filter(row => (row[searchType]||'') === searchValue);
     }
     const metrics = computeMetrics(filteredData);
 
-    // KPI Cards
     document.getElementById('kpi-cards').innerHTML = `
         <div class="card"><h3>Total Invoice Value</h3><p>Rs ${metrics.totalInvoiceValue.toFixed(2)}</p></div>
         <div class="card"><h3>Total Outstanding</h3><p>Rs ${metrics.totalOutstanding.toFixed(2)}</p></div>
@@ -349,7 +347,6 @@ function updateDashboard() {
         <div class="card" data-days="90+"><h3>90+ Days</h3><p>Rs ${metrics.days90Plus.toFixed(2)}</p></div>
         <div class="card"><h3>DSO (Annual)</h3><p>${metrics.dso.toFixed(2)} days</p></div>
     `;
-    // Table
     const tableBody = document.getElementById('table-body');
     tableBody.innerHTML = '';
     filteredData.slice(0, 10).forEach((row) => {
@@ -368,7 +365,6 @@ function updateDashboard() {
         tableBody.appendChild(tr);
     });
 
-    // Chart
     if (chartInstance) chartInstance.destroy();
     const daysSummary = {
         '<60 Days': filteredData.filter(row => row['DAYS OF INVOICE'] < 60).reduce((sum, row) => sum + row['Amount Pending'], 0),
@@ -391,7 +387,6 @@ function updateDashboard() {
         }
     });
 
-    // Show admin panel only for Eshak
     if (loggedInRegion && loggedInRegion.toLowerCase() === 'eshak') {
         document.getElementById('admin-panel').style.display = '';
         showAdminPanel();
@@ -400,22 +395,38 @@ function updateDashboard() {
     }
 }
 
-// ADMIN password update panel
 function showAdminPanel() {
     const table = document.getElementById('password-table');
     table.innerHTML = '';
     const passwords = getRegionPasswords();
     for (const region of regionList) {
         const pwd = passwords[region.trim().toLowerCase()] || '12345678';
+        const safeId = 'pwd_' + btoa(encodeURIComponent(region)).replace(/=+$/g,'');
         const row = document.createElement('tr');
         row.innerHTML = `<td>${region}</td>
-            <td><input type="password" value="${pwd}" id="pwd_${region}" style="width:120px"></td>
-            <td><button onclick="updatePassword('${region}')">Update</button></td>`;
+            <td>
+                <input type="password" id="${safeId}" value="${pwd}">
+                <button onclick="toggleShow('${safeId}', this)" title="Show/hide password" style="margin-left:3px;">👁️</button>
+            </td>
+            <td>
+                <button onclick="updatePassword('${region}', '${safeId}', this)">Update</button>
+            </td>`;
         table.appendChild(row);
     }
 }
-window.updatePassword = function(region) {
-    const newpwd = document.getElementById('pwd_' + region).value;
+window.toggleShow = function(fieldId, btn) {
+    const input = document.getElementById(fieldId);
+    if (!input) return;
+    if (input.type === "password") {
+        input.type = "text";
+        btn.innerText = "🙈";
+    } else {
+        input.type = "password";
+        btn.innerText = "👁️";
+    }
+};
+window.updatePassword = function(region, fieldId, btn) {
+    const newpwd = document.getElementById(fieldId).value;
     if (!newpwd) {
         alert("Password cannot be blank.");
         return;
@@ -423,6 +434,10 @@ window.updatePassword = function(region) {
     const passwords = getRegionPasswords();
     passwords[region.trim().toLowerCase()] = newpwd;
     saveRegionPasswords(passwords);
+    // Visual feedback:
+    const row = btn.closest("tr");
+    row.classList.add("password-row-updated");
+    setTimeout(() => row.classList.remove("password-row-updated"), 1300);
     alert("Password updated for " + region);
 };
 
@@ -444,7 +459,6 @@ document.getElementById('login-form').addEventListener('submit', function(event)
         document.getElementById('login-error').innerText = "Incorrect password.";
         return;
     }
-    // Success!
     loggedInRegion = enteredRegion.trim();
     document.getElementById('login-section').style.display = 'none';
     document.getElementById('dashboard-section').style.display = '';
@@ -452,15 +466,13 @@ document.getElementById('login-form').addEventListener('submit', function(event)
     document.getElementById('username').value = '';
     document.getElementById('password').value = '';
     updateDashboard();
-    // Show/hide region search option
-    if(loggedInRegion.toLowerCase() === "eshak"){
+    if(loggedInRegion.toLowerCase() === "eshak") {
         document.getElementById('region-radio').style.display = '';
         document.getElementById('region-label').style.display = '';
     } else {
         document.getElementById('region-radio').style.display = 'none';
         document.getElementById('region-label').style.display = 'none';
     }
-    // Always enable 'customer' search autocomplete for everyone
     populateAutocomplete('Name of the Customer');
 });
 
@@ -468,7 +480,6 @@ document.getElementById('logout-btn').addEventListener('click', function() {
     loggedInRegion = null;
     document.getElementById('dashboard-section').style.display = 'none';
     document.getElementById('login-section').style.display = 'block';
-    // Reset search inputs and autocomplete
     document.getElementById('search-input').value = '';
     populateAutocomplete('Name of the Customer');
 });
