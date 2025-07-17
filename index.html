@@ -59,18 +59,18 @@
         </div>
         <div id="error-message"></div>
         <div id="admin-panel" style="display:none;">
-            <h3>Admin: Change Region Passwords</h3>
-            <table>
-                <thead><tr><th>Region (Place)</th><th>Password</th><th>Action</th></tr></thead>
-                <tbody id="password-table"></tbody>
-            </table>
+            <h3>Admin: Update Password for All Regions</h3>
+            <p>Enter new password to apply to all regions:</p>
+            <input type="password" id="global-password-input" style="width:200px; padding:5px;">
+            <button onclick="updateAllPasswords()" style="margin-left:10px;">Update All</button>
+            <div id="update-status" style="color:green; margin-top:10px;"></div>
         </div>
         <div class="search-container" id="search-container">
             <label>Search By:</label>
             <input type="radio" name="search-type" value="Name of the Customer" id="customer-radio" checked>
             <label for="customer-radio">Customer</label>
             <input type="radio" name="search-type" value="Place" id="region-radio">
-            <label for="region-radio" id="region-label">Region</label>
+            <label for="region-label" id="region-label">Region</label>
             <br>
             <input type="text" id="search-input" autocomplete="off" placeholder="Start typing to search...">
             <div id="autocomplete-list"></div>
@@ -117,7 +117,6 @@ function ensureRegionRegistered(region) {
     }
 }
 
-// Always fetch fresh Sheet
 async function fetchData() {
     try {
         const response = await fetch(getSheetURL());
@@ -141,11 +140,9 @@ async function fetchData() {
                     normalizedHeader === 'status' ? 'STATUS' : 
                     normalizedHeader] = value;
             });
-            // Parse invoice date (supports dd/mm/yyyy, yyyy-mm-dd)
             let idate = NaN;
             if (obj['Inv. Date']) {
                 if (obj['Inv. Date'].match(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/)) {
-                    // dd/mm/yyyy
                     const [d, m, y] = obj['Inv. Date'].split("/");
                     idate = new Date(+y, +m-1, +d);
                 } else {
@@ -154,7 +151,6 @@ async function fetchData() {
             }
             obj['Invoice Value'] = parseFloat((obj['Invoice Value']||'').replace(/[₹Rs$,]/gi, '').replace(/,/g, '').replace(/\s/g, '') || 0);
             obj['Amount Pending'] = parseFloat((obj['Amount Pending']||'').replace(/[₹Rs$,]/gi, '').replace(/,/g, '').replace(/\s/g, '') || 0);
-            // Always calculate Days of Invoice
             if (!isNaN(idate)) {
                 const now = new Date();
                 obj['DAYS OF INVOICE'] = Math.floor((now.getTime() - idate.getTime()) / (1000*60*60*24));
@@ -228,8 +224,6 @@ function computeMetrics(filteredData) {
 }
 
 function updateDashboard() {
-    // DEBUGGING: See login state in DevTools
-    //console.log('[DEBUG updateDashboard] loggedInRegion=', loggedInRegion);
     let searchType = document.querySelector('input[name="search-type"]:checked')?.value || 'Name of the Customer';
     let searchValue = document.getElementById('search-input').value.trim();
     let filteredData;
@@ -291,55 +285,36 @@ function updateDashboard() {
             scales: { y: { beginAtZero: true } }
         }
     });
-    // ###### PROVEN ROBUST ADMIN BLOCK LOGIC ######
     if (
         typeof loggedInRegion === 'string'
         && loggedInRegion.trim().toLowerCase() === 'eshak'
     ) {
-        //console.log('[DEBUG] Enabling admin panel!');
         document.getElementById('admin-panel').style.display = '';
-        showAdminPanel();
     } else {
         document.getElementById('admin-panel').style.display = 'none';
     }
 }
 
-function showAdminPanel() {
-    const table = document.getElementById('password-table');
-    table.innerHTML = '';
-    const passwords = getRegionPasswords();
-    for (const region of regionList) {
-        const key = region.trim().toLowerCase();
-        const pwd = passwords[key] || '12345678';
-        const inputId = 'pwd_' + btoa(encodeURIComponent(region));
-        const row = document.createElement('tr');
-        row.innerHTML = `<td>${region}</td>
-            <td><input type="password" id="${inputId}" value="${pwd}">
-                <button onclick="toggleShow('${inputId}', this)">👁️</button>
-            </td>
-            <td>
-                <button onclick="updatePassword('${region}', '${inputId}', this)">Update</button>
-            </td>`;
-        table.appendChild(row);
+function updateAllPasswords() {
+    if (loggedInRegion && loggedInRegion.trim().toLowerCase() !== 'eshak') {
+        document.getElementById('update-status').innerText = 'Only admin (eshak) can update passwords.';
+        document.getElementById('update-status').style.color = 'red';
+        return;
     }
-}
-window.toggleShow = function(id, btn) {
-    const input = document.getElementById(id);
-    if (input.type === "password") {
-        input.type = "text"; btn.innerText = "🙈";
-    } else { input.type = "password"; btn.innerText = "👁️"; }
-};
-window.updatePassword = function(region, inputId, btn) {
-    const newpwd = document.getElementById(inputId).value;
-    if (!newpwd) {
-        alert("Password cannot be blank."); return;
+    const newPassword = document.getElementById('global-password-input').value.trim();
+    if (!newPassword) {
+        document.getElementById('update-status').innerText = 'Password cannot be blank.';
+        document.getElementById('update-status').style.color = 'red';
+        return;
     }
     const passwords = getRegionPasswords();
-    passwords[region.trim().toLowerCase()] = newpwd;
+    regionList.forEach(region => {
+        passwords[region.trim().toLowerCase()] = newPassword;
+    });
     saveRegionPasswords(passwords);
-    btn.closest('tr').style.background = "#c3ebc8";
-    setTimeout(() => btn.closest('tr').style.background = "", 1300);
-    alert("Password updated for " + region);
+    document.getElementById('global-password-input').value = '';
+    document.getElementById('update-status').innerText = 'Passwords updated for all regions.';
+    document.getElementById('update-status').style.color = 'green';
 }
 
 document.getElementById('login-form').addEventListener('submit', function(event) {
@@ -397,7 +372,6 @@ document.getElementById('search-input').addEventListener('input', function() {
 
 fetchData();
 setInterval(fetchData, 60000);
-
 </script>
 </body>
 </html>
