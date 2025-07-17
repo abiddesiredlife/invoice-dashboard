@@ -73,17 +73,17 @@
         </div>
     </div>
     <script>
-        const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrtlUIgWw1mxcwNTm_e_YkfW_cr0tmPM4o0S2wHdLQ3Gv4NgfPOwp_kv1pTAIZ1Q/pub?output=csv";
         let data = [];
         let regionList = [];
         let loggedInRegion = null;
+        let storage = typeof localStorage !== 'undefined' ? localStorage : { getItem: () => '{}', setItem: () => {} };
 
         function getRegionPasswords() {
-            try { return JSON.parse(localStorage.getItem('region_passwords') || '{}'); }
+            try { return JSON.parse(storage.getItem('region_passwords') || '{}'); }
             catch { return {}; }
         }
         function saveRegionPasswords(passwords) {
-            localStorage.setItem('region_passwords', JSON.stringify(passwords));
+            storage.setItem('region_passwords', JSON.stringify(passwords));
         }
         function ensureRegionRegistered(region) {
             let passwords = getRegionPasswords();
@@ -95,7 +95,7 @@
 
         async function fetchData() {
             try {
-                const response = await fetch(SHEET_URL + "&t=" + Date.now());
+                const response = await fetch("https://docs.google.com/spreadsheets/d/e/2PACX-1vSrtlUIgWw1mxcwNTm_e_YkfW_cr0tmPM4o0S2wHdLQ3Gv4NgfPOwp_kv1pTAIZ1Q/pub?output=csv" + "&t=" + Date.now());
                 if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                 const text = await response.text();
                 const rows = text.split('\n').map(row => row.split(',').map(cell => cell.trim()));
@@ -191,6 +191,7 @@
             const days60_90 = filteredData.filter(row => row['DAYS OF INVOICE'] >= 60 && row['DAYS OF INVOICE'] < 90).reduce((sum, row) => sum + row['Amount Pending'], 0);
             const days90Plus = filteredData.filter(row => row['DAYS OF INVOICE'] >= 90).reduce((sum, row) => sum + row['Amount Pending'], 0);
             const dso = totalInvoiceValue > 0 ? (totalOutstanding / (totalInvoiceValue / 365)) * 30 : 0;
+            console.log('DSO Calculation:', { totalOutstanding, totalInvoiceValue, dso });
             return { totalInvoiceValue, totalOutstanding, days60_90, days90Plus, dso };
         }
 
@@ -234,6 +235,7 @@
             } else {
                 document.getElementById('admin-panel').style.display = 'none';
             }
+            console.log('Dashboard updated for:', loggedInRegion);
         }
 
         function updatePassword() {
@@ -257,49 +259,57 @@
             document.getElementById('new-password').value = '';
         }
 
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('login-form').addEventListener('submit', function(e) {
-                e.preventDefault();
-                const username = document.getElementById('username').value.trim();
-                const password = document.getElementById('password').value;
-                const region = regionList.find(r => r.toLowerCase() === username.toLowerCase());
-                if (!region) {
-                    document.getElementById('login-error').innerText = 'Invalid region.';
-                    return;
-                }
-                ensureRegionRegistered(region);
-                if (getRegionPasswords()[region.toLowerCase()] !== password) {
-                    document.getElementById('login-error').innerText = 'Incorrect password.';
-                    return;
-                }
-                loggedInRegion = region;
-                document.getElementById('login-section').style.display = 'none';
-                document.getElementById('dashboard-section').style.display = '';
-                document.getElementById('login-error').innerText = '';
-                updateDashboard();
-            });
-
-            document.getElementById('logout-btn').addEventListener('click', function() {
-                console.log('Logout clicked'); // Debug log
+        const logoutBtn = document.getElementById('logout-btn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', function() {
+                console.log('Logout clicked');
                 loggedInRegion = null;
                 document.getElementById('dashboard-section').style.display = 'none';
                 document.getElementById('login-section').style.display = 'block';
                 document.getElementById('search-input').value = '';
             });
+        } else {
+            console.error('Logout button not found');
+        }
 
-            document.querySelectorAll('input[name="search-type"]').forEach(radio => {
-                radio.addEventListener('change', function() {
-                    document.getElementById('search-input').value = '';
-                    populateAutocomplete();
-                    updateDashboard();
-                });
+        document.querySelectorAll('input[name="search-type"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                document.getElementById('search-input').value = '';
+                populateAutocomplete();
+                updateDashboard();
             });
-
-            document.getElementById('search-input').addEventListener('input', updateDashboard);
         });
 
-        fetchData();
-        setInterval(fetchData, 60000);
+        document.getElementById('search-input').addEventListener('input', updateDashboard);
+
+        document.getElementById('login-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const region = regionList.find(r => r.toLowerCase() === username.toLowerCase());
+            if (!region) {
+                document.getElementById('login-error').innerText = 'Invalid region.';
+                return;
+            }
+            ensureRegionRegistered(region);
+            const passwords = getRegionPasswords();
+            if (passwords[region.toLowerCase()] !== password) {
+                document.getElementById('login-error').innerText = 'Incorrect password.';
+                return;
+            }
+            loggedInRegion = region;
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('dashboard-section').style.display = '';
+            document.getElementById('login-error').innerText = '';
+            console.log('Login successful for:', loggedInRegion);
+            alert('Login successful! Loading dashboard...');
+            updateDashboard();
+        });
+
+        window.onload = function() {
+            fetchData();
+            setInterval(fetchData, 60000);
+        };
     </script>
 </body>
 </html>
