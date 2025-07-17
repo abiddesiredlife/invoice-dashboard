@@ -107,15 +107,9 @@
             display: none;
         }
         @media (max-width: 768px) {
-            .card {
-                width: 45%;
-            }
-            #search-input, #autocomplete-list {
-                width: 80%;
-            }
-            table, canvas {
-                width: 95%;
-            }
+            .card { width: 45%; }
+            #search-input, #autocomplete-list { width: 80%; }
+            table, canvas { width: 95%; }
         }
         #admin-panel {
             display: none;
@@ -154,7 +148,7 @@
         </div>
         <div id="error-message"></div>
 
-        <!-- ADMIN PANEL -->
+        <!-- ADMIN PANEL (Eshak only) -->
         <div id="admin-panel">
             <h3>Admin: Change Region Passwords</h3>
             <table>
@@ -163,16 +157,18 @@
             </table>
         </div>
 
-        <div class="search-container">
+        <!-- SEARCH CONTAINER: Always show "customer" search for all roles -->
+        <div class="search-container" id="search-container">
             <label>Search By:</label>
             <input type="radio" name="search-type" value="Name of the Customer" id="customer-radio" checked>
             <label for="customer-radio">Customer</label>
             <input type="radio" name="search-type" value="Place" id="region-radio">
-            <label for="region-radio">Region</label>
+            <label for="region-radio" id="region-label">Region</label>
             <br>
             <input type="text" id="search-input" placeholder="Start typing to search...">
             <div id="autocomplete-list"></div>
         </div>
+
         <div class="card-container" id="kpi-cards"></div>
         <canvas id="days-chart"></canvas>
         <table id="data-table">
@@ -192,302 +188,305 @@
             <tbody id="table-body"></tbody>
         </table>
     </div>
-    <script>
-        const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrtlUIgWw1mxcwNTm_e_YkfW_cr0tmPM4o0S2wHdLQ3Gv4NgfPOwp_kv1pTAIZ1Q/pub?output=csv";
-        let data = [];
-        let chartInstance = null;
-        let regionList = []; // List of region names found in Place column
-        let loggedInRegion = null; // The region (Place) currently logged-in
+<script>
+const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrtlUIgWw1mxcwNTm_e_YkfW_cr0tmPM4o0S2wHdLQ3Gv4NgfPOwp_kv1pTAIZ1Q/pub?output=csv";
+let data = [];
+let chartInstance = null;
+let regionList = [];
+let loggedInRegion = null;
 
-        // --- Password Storage Functions using localStorage ---
-        function getRegionPasswords() {
-            try {
-                const out = JSON.parse(localStorage.getItem('region_passwords') || '{}');
-                if (typeof out === 'object' && out !== null) return out;
-            } catch (e) {}
-            return {};
-        }
-        function saveRegionPasswords(passwords) {
-            localStorage.setItem('region_passwords', JSON.stringify(passwords));
-        }
-        function ensureRegionRegistered(region) {
-            // Register place in passwords/localStorage if doesn't exist, with default password
-            const passwords = getRegionPasswords();
-            if (!(region.trim().toLowerCase() in passwords)) {
-                passwords[region.trim().toLowerCase()] = "12345678";
-                saveRegionPasswords(passwords);
-            }
-        }
 
-        // --- Fetch Data and Parse regions ---
-        async function fetchData() {
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-                const text = await response.text();
-                const rows = text.split('\n').map(row => row.split(',').map(cell => cell.trim()));
-                const headers = rows[0].map(header => header.trim().toLowerCase());
-                data = rows.slice(1).filter(row => row.length >= headers.length).map(row => {
-                    let obj = {};
-                    headers.forEach((header, i) => {
-                        const normalizedHeader = header.replace(/\s+/g, ' ').trim().toLowerCase();
-                        const value = row[i] !== undefined ? row[i].trim() : 'N/A';
-                        obj[normalizedHeader === 'name of the customer' ? 'Name of the Customer' : 
-                            normalizedHeader === 'place' ? 'Place' : 
-                            normalizedHeader === 'inv. no.' ? 'Inv. No.' : 
-                            normalizedHeader === 'inv. date' ? 'Inv. Date' : 
-                            normalizedHeader === 's.no.' ? 'S.No.' : 
-                            normalizedHeader === 'invoice value' ? 'Invoice Value' : 
-                            normalizedHeader === 'amount pending' ? 'Amount Pending' : 
-                            normalizedHeader === 'days of invoice' ? 'DAYS OF INVOICE' : 
-                            normalizedHeader === 'status' ? 'STATUS' : 
-                            normalizedHeader] = value;
-                    });
-                    obj['DAYS OF INVOICE'] = parseFloat((obj['DAYS OF INVOICE'] || '').replace(/[^0-9.-]+/g, '') || 0);
-                    obj['Invoice Value'] = parseFloat((obj['Invoice Value'] || '').replace(/[₹Rs$,]/gi, '').replace(/,/g, '').replace(/\s/g, '') || 0);
-                    obj['Amount Pending'] = parseFloat((obj['Amount Pending'] || '').replace(/[₹Rs$,]/gi, '').replace(/,/g, '').replace(/\s/g, '') || 0);
-                    return obj;
-                });
+function getRegionPasswords() {
+    try {
+        const out = JSON.parse(localStorage.getItem('region_passwords') || '{}');
+        if (typeof out === 'object' && out !== null) return out;
+    } catch (e) {}
+    return {};
+}
+function saveRegionPasswords(passwords) {
+    localStorage.setItem('region_passwords', JSON.stringify(passwords));
+}
+function ensureRegionRegistered(region) {
+    const passwords = getRegionPasswords();
+    if (!(region.trim().toLowerCase() in passwords)) {
+        passwords[region.trim().toLowerCase()] = "12345678";
+        saveRegionPasswords(passwords);
+    }
+}
 
-                regionList = [...new Set(data.map(row => row['Place']).map(x=>x && x.trim()).filter(val => !!val && val !== 'N/A'))];
-                // For each region, ensure password is registered with default
-                regionList.forEach(ensureRegionRegistered);
-
-                // If already logged in (after refresh), keep session
-                if (loggedInRegion) {
-                    document.getElementById('login-section').style.display = 'none';
-                    document.getElementById('dashboard-section').style.display = '';
-                    updateDashboard();
-                }
-                
-                // Populate autocomplete only for customer by default (since region will be hidden for non-admins)
-                populateAutocomplete('Name of the Customer');
-            } catch (error) {
-                console.error('Error fetching data:', error);
-                document.getElementById('error-message').style.display = 'block';
-                document.getElementById('error-message').innerText = 'Error loading data: ' + error.message;
-            }
-        }
-
-        // --- Autocomplete for Search ---
-        function populateAutocomplete(searchType) {
-            const input = document.getElementById('search-input');
-            const list = document.getElementById('autocomplete-list');
-            list.innerHTML = '';
-            // Filter data for current logged-in region user
-            let ds = data;
-            if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak') {
-                ds = data.filter(row => row['Place'] && row['Place'].trim().toLowerCase() === loggedInRegion.toLowerCase());
-            }
-            const uniqueValues = [...new Set(ds.map(row => row[searchType]))]
-                .filter(val => val && val.trim() !== '')
-                .sort();
-            input.addEventListener('input', function() {
-                const query = input.value.trim().toLowerCase();
-                list.innerHTML = '';
-                if (query) {
-                    const matches = uniqueValues.filter(val => val.toLowerCase().includes(query));
-                    matches.forEach(val => {
-                        const div = document.createElement('div');
-                        div.innerText = val;
-                        div.addEventListener('click', () => {
-                            input.value = val;
-                            list.innerHTML = '';
-                            list.style.display = 'none';
-                            updateDashboard();
-                        });
-                        list.appendChild(div);
-                    });
-                    list.style.display = matches.length ? 'block' : 'none';
-                } else {
-                    list.style.display = 'none';
-                }
+// Fetch data and register regions for login/passwords
+async function fetchData() {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        const text = await response.text();
+        const rows = text.split('\n').map(row => row.split(',').map(cell => cell.trim()));
+        const headers = rows[0].map(header => header.trim().toLowerCase());
+        data = rows.slice(1).filter(row => row.length >= headers.length).map(row => {
+            let obj = {};
+            headers.forEach((header, i) => {
+                const normalizedHeader = header.replace(/\s+/g, ' ').trim().toLowerCase();
+                const value = row[i] !== undefined ? row[i].trim() : 'N/A';
+                obj[normalizedHeader === 'name of the customer' ? 'Name of the Customer' : 
+                    normalizedHeader === 'place' ? 'Place' : 
+                    normalizedHeader === 'inv. no.' ? 'Inv. No.' : 
+                    normalizedHeader === 'inv. date' ? 'Inv. Date' : 
+                    normalizedHeader === 's.no.' ? 'S.No.' : 
+                    normalizedHeader === 'invoice value' ? 'Invoice Value' : 
+                    normalizedHeader === 'amount pending' ? 'Amount Pending' : 
+                    normalizedHeader === 'days of invoice' ? 'DAYS OF INVOICE' : 
+                    normalizedHeader === 'status' ? 'STATUS' : 
+                    normalizedHeader] = value;
             });
-        }
+            obj['DAYS OF INVOICE'] = parseFloat((obj['DAYS OF INVOICE'] || '').replace(/[^0-9.-]+/g, '') || 0);
+            obj['Invoice Value'] = parseFloat((obj['Invoice Value'] || '').replace(/[₹Rs$,]/gi, '').replace(/,/g, '').replace(/\s/g, '') || 0);
+            obj['Amount Pending'] = parseFloat((obj['Amount Pending'] || '').replace(/[₹Rs$,]/gi, '').replace(/,/g, '').replace(/\s/g, '') || 0);
+            return obj;
+        });
+        regionList = [...new Set(data.map(row => row['Place']).map(x=>x && x.trim()).filter(val => !!val && val !== 'N/A'))];
+        regionList.forEach(ensureRegionRegistered);
 
-        // --- Metrics ---
-        function computeMetrics(filteredData) {
-            const totalInvoiceValue = filteredData.reduce((sum, row) => sum + row['Invoice Value'], 0);
-            const totalOutstanding = filteredData.reduce((sum, row) => sum + row['Amount Pending'], 0);
-            const days60_90 = filteredData
-                .filter(row => row['DAYS OF INVOICE'] >= 60 && row['DAYS OF INVOICE'] < 90)
-                .reduce((sum, row) => sum + row['Amount Pending'], 0);
-            const days90Plus = filteredData
-                .filter(row => row['DAYS OF INVOICE'] >= 90)
-                .reduce((sum, row) => sum + row['Amount Pending'], 0);
-            const totalReceivables = data.reduce((sum, row) => sum + row['Amount Pending'], 0);
-            const totalCreditSales = data.reduce((sum, row) => sum + row['Invoice Value'], 0);
-            const dso = totalCreditSales > 0 ? (totalReceivables / totalCreditSales) * 365 : 0;
-            return { totalInvoiceValue, totalOutstanding, days60_90, days90Plus, dso };
-        }
-
-        // --- DASHBOARD UPDATE MAIN LOGIC ---
-        function updateDashboard() {
-            if (!data || !data.length) return;
-            let searchType = document.querySelector('input[name="search-type"]:checked')?.value || 'Name of the Customer';
-            let searchValue = document.getElementById('search-input').value.trim();
-            let filteredData;
-
-            if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak') {
-                filteredData = data.filter(row => (row['Place']||'').trim().toLowerCase() === loggedInRegion.toLowerCase());
-                // Hide region search for normal users
-                document.getElementById('region-radio').parentElement.style.display = 'none';
-            } else {
-                // admin
-                filteredData = data;
-                document.getElementById('region-radio').parentElement.style.display = '';
-            }
-            if (searchValue) {
-                filteredData = filteredData.filter(row => (row[searchType]||'') === searchValue);
-            }
-            const metrics = computeMetrics(filteredData);
-
-            // KPI Cards
-            document.getElementById('kpi-cards').innerHTML = `
-                <div class="card"><h3>Total Invoice Value</h3><p>Rs ${metrics.totalInvoiceValue.toFixed(2)}</p></div>
-                <div class="card"><h3>Total Outstanding</h3><p>Rs ${metrics.totalOutstanding.toFixed(2)}</p></div>
-                <div class="card"><h3>60-90 Days</h3><p>Rs ${metrics.days60_90.toFixed(2)}</p></div>
-                <div class="card" data-days="90+"><h3>90+ Days</h3><p>Rs ${metrics.days90Plus.toFixed(2)}</p></div>
-                <div class="card"><h3>DSO (Annual)</h3><p>${metrics.dso.toFixed(2)} days</p></div>
-            `;
-
-            // Table
-            const tableBody = document.getElementById('table-body');
-            tableBody.innerHTML = '';
-            filteredData.slice(0, 10).forEach((row) => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${row['S.No.'] || 'N/A'}</td>
-                    <td>${row['Name of the Customer'] || 'N/A'}</td>
-                    <td>${row['Place'] || 'N/A'}</td>
-                    <td>${row['Inv. No.'] || 'N/A'}</td>
-                    <td>${row['Inv. Date'] || 'N/A'}</td>
-                    <td>${row['DAYS OF INVOICE'] !== undefined ? row['DAYS OF INVOICE'] : 'N/A'}</td>
-                    <td>Rs ${row['Invoice Value'].toFixed(2)}</td>
-                    <td>Rs ${row['Amount Pending'].toFixed(2)}</td>
-                    <td>${row['STATUS'] || 'N/A'}</td>
-                `;
-                tableBody.appendChild(tr);
-            });
-
-            // Chart
-            if (chartInstance) chartInstance.destroy();
-            const daysSummary = {
-                '<60 Days': filteredData.filter(row => row['DAYS OF INVOICE'] < 60).reduce((sum, row) => sum + row['Amount Pending'], 0),
-                '60-90 Days': metrics.days60_90,
-                '90+ Days': metrics.days90Plus
-            };
-            chartInstance = new Chart(document.getElementById('days-chart'), {
-                type: 'bar',
-                data: {
-                    labels: ['<60 Days', '60-90 Days', '90+ Days'],
-                    datasets: [{
-                        label: 'Outstanding Amount (Rs)',
-                        data: [daysSummary['<60 Days'], daysSummary['60-90 Days'], daysSummary['90+ Days']],
-                        backgroundColor: ['#36A2EB', '#FFCE56', '#8B0000']
-                    }]
-                },
-                options: {
-                    plugins: { title: { display: true, text: 'Outstanding by Days Category' } },
-                    scales: { y: { beginAtZero: true } }
-                }
-            });
-
-            // Show admin panel only for admin
-            if (loggedInRegion && loggedInRegion.toLowerCase() === 'eshak') {
-                document.getElementById('admin-panel').style.display = '';
-                showAdminPanel();
-            } else {
-                document.getElementById('admin-panel').style.display = 'none';
-            }
-        }
-
-        // --- ADMIN PANEL ---
-        function showAdminPanel() {
-            const table = document.getElementById('password-table');
-            table.innerHTML = '';
-            const passwords = getRegionPasswords();
-            for (const region of regionList) {
-                const pwd = passwords[region.trim().toLowerCase()] || '12345678';
-                const row = document.createElement('tr');
-                row.innerHTML = `<td>${region}</td>
-                    <td><input type="password" value="${pwd}" id="pwd_${region}" style="width:120px"></td>
-                    <td><button onclick="updatePassword('${region}')">Update</button></td>`;
-                table.appendChild(row);
-            }
-        }
-        window.updatePassword = function(region) {
-            const newpwd = document.getElementById('pwd_' + region).value;
-            if (!newpwd) {
-                alert("Password cannot be blank.");
-                return;
-            }
-            const passwords = getRegionPasswords();
-            passwords[region.trim().toLowerCase()] = newpwd;
-            saveRegionPasswords(passwords);
-            alert("Password updated for " + region);
-        };
-
-        // --- LOGIN LOGIC ---
-        document.getElementById('login-form').addEventListener('submit', function(event) {
-            event.preventDefault();
-            const usernameInput = document.getElementById('username').value.trim();
-            const passwordInput = document.getElementById('password').value;
-            if(!usernameInput || !passwordInput) return;
-            // Username must match an available region (case-insensitive)
-            const enteredRegion = regionList.find(
-                reg => reg.trim().toLowerCase() === usernameInput.toLowerCase()
-            );
-            if(!enteredRegion) {
-                document.getElementById('login-error').innerText = "Invalid region (Place) name.";
-                return;
-            }
-            ensureRegionRegistered(enteredRegion);
-            const pwdStore = getRegionPasswords();
-            if (pwdStore[enteredRegion.trim().toLowerCase()] !== passwordInput) {
-                document.getElementById('login-error').innerText = "Incorrect password.";
-                return;
-            }
-            // Passed authentication
-            loggedInRegion = enteredRegion.trim();
+        // If already logged in after reload
+        if (loggedInRegion) {
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('dashboard-section').style.display = '';
-            document.getElementById('login-error').innerText = '';
-            document.getElementById('username').value = '';
-            document.getElementById('password').value = '';
             updateDashboard();
-            // Re-initialize autocomplete for current user's scope
-            if(loggedInRegion.toLowerCase() === "eshak"){
-                document.getElementById('region-radio').parentElement.style.display = '';
-            } else {
-                document.getElementById('region-radio').parentElement.style.display = 'none';
-            }
-            populateAutocomplete('Name of the Customer');
-        });
+        }
+        // Always allow autocomplete for customer for all roles
+        populateAutocomplete('Name of the Customer');
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        document.getElementById('error-message').style.display = 'block';
+        document.getElementById('error-message').innerText = 'Error loading data: ' + error.message;
+    }
+}
 
-        // --- LOGOUT ---
-        document.getElementById('logout-btn').addEventListener('click', function() {
-            loggedInRegion = null;
-            document.getElementById('dashboard-section').style.display = 'none';
-            document.getElementById('login-section').style.display = 'block';
-        });
-
-        // --- SEARCH BEHAVIOR ---
-        document.querySelectorAll('input[name="search-type"]').forEach(radio => {
-            radio.addEventListener('change', function() {
-                document.getElementById('search-input').value = '';
-                populateAutocomplete(radio.value);
-                updateDashboard();
+// Autocomplete for the given field; only customers from that user's region
+function populateAutocomplete(searchType) {
+    const input = document.getElementById('search-input');
+    const list = document.getElementById('autocomplete-list');
+    list.innerHTML = '';
+    // Limit dataset to allowed view
+    let ds = data;
+    if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak' && searchType === 'Name of the Customer') {
+        ds = data.filter(row => row['Place'] && row['Place'].trim().toLowerCase() === loggedInRegion.toLowerCase());
+    }
+    else if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak' && searchType === 'Place') {
+        // User is not admin, but selects region search (defensively). Should only have the one region available!
+        ds = data.filter(row => row['Place'] && row['Place'].trim().toLowerCase() === loggedInRegion.toLowerCase());
+    }
+    // Otherwise: admin or not logged in - gets all available
+    const uniqueValues = [...new Set(ds.map(row => row[searchType]))]
+        .filter(val => val && val.trim() !== '')
+        .sort();
+    input.oninput = function() {
+        const query = input.value.trim().toLowerCase();
+        list.innerHTML = '';
+        if (query) {
+            const matches = uniqueValues.filter(val => val.toLowerCase().includes(query));
+            matches.forEach(val => {
+                const div = document.createElement('div');
+                div.innerText = val;
+                div.onclick = () => {
+                    input.value = val;
+                    list.innerHTML = '';
+                    list.style.display = 'none';
+                    updateDashboard();
+                };
+                list.appendChild(div);
             });
-        });
-        document.getElementById('search-input').addEventListener('input', function() {
-            updateDashboard();
-        });
+            list.style.display = matches.length ? 'block' : 'none';
+        } else {
+            list.style.display = 'none';
+        }
+    };
+}
 
-        // --- ON LOAD INIT ---
-        fetchData();
-        setInterval(fetchData, 60000);
+// KPI/Metrics
+function computeMetrics(filteredData) {
+    const totalInvoiceValue = filteredData.reduce((sum, row) => sum + row['Invoice Value'], 0);
+    const totalOutstanding = filteredData.reduce((sum, row) => sum + row['Amount Pending'], 0);
+    const days60_90 = filteredData
+        .filter(row => row['DAYS OF INVOICE'] >= 60 && row['DAYS OF INVOICE'] < 90)
+        .reduce((sum, row) => sum + row['Amount Pending'], 0);
+    const days90Plus = filteredData
+        .filter(row => row['DAYS OF INVOICE'] >= 90)
+        .reduce((sum, row) => sum + row['Amount Pending'], 0);
+    const totalReceivables = data.reduce((sum, row) => sum + row['Amount Pending'], 0);
+    const totalCreditSales = data.reduce((sum, row) => sum + row['Invoice Value'], 0);
+    const dso = totalCreditSales > 0 ? (totalReceivables / totalCreditSales) * 365 : 0;
+    return { totalInvoiceValue, totalOutstanding, days60_90, days90Plus, dso };
+}
 
-    </script>
+function updateDashboard() {
+    if (!data || !data.length) return;
+    let searchType = document.querySelector('input[name="search-type"]:checked')?.value || 'Name of the Customer';
+    let searchValue = document.getElementById('search-input').value.trim();
+    let filteredData;
+    // Region Users: Only their region's data
+    if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak') {
+        filteredData = data.filter(row => (row['Place']||'').trim().toLowerCase() === loggedInRegion.toLowerCase());
+        // Hide region option/search for them
+        document.getElementById('region-radio').style.display = 'none';
+        document.getElementById('region-label').style.display = 'none';
+    } else {
+        // Admin can search by Place
+        filteredData = data;
+        document.getElementById('region-radio').style.display = '';
+        document.getElementById('region-label').style.display = '';
+    }
+    // Still use search box filter
+    if (searchValue) {
+        filteredData = filteredData.filter(row => (row[searchType]||'') === searchValue);
+    }
+    const metrics = computeMetrics(filteredData);
+
+    // KPI Cards
+    document.getElementById('kpi-cards').innerHTML = `
+        <div class="card"><h3>Total Invoice Value</h3><p>Rs ${metrics.totalInvoiceValue.toFixed(2)}</p></div>
+        <div class="card"><h3>Total Outstanding</h3><p>Rs ${metrics.totalOutstanding.toFixed(2)}</p></div>
+        <div class="card"><h3>60-90 Days</h3><p>Rs ${metrics.days60_90.toFixed(2)}</p></div>
+        <div class="card" data-days="90+"><h3>90+ Days</h3><p>Rs ${metrics.days90Plus.toFixed(2)}</p></div>
+        <div class="card"><h3>DSO (Annual)</h3><p>${metrics.dso.toFixed(2)} days</p></div>
+    `;
+    // Table
+    const tableBody = document.getElementById('table-body');
+    tableBody.innerHTML = '';
+    filteredData.slice(0, 10).forEach((row) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${row['S.No.'] || 'N/A'}</td>
+            <td>${row['Name of the Customer'] || 'N/A'}</td>
+            <td>${row['Place'] || 'N/A'}</td>
+            <td>${row['Inv. No.'] || 'N/A'}</td>
+            <td>${row['Inv. Date'] || 'N/A'}</td>
+            <td>${row['DAYS OF INVOICE'] !== undefined ? row['DAYS OF INVOICE'] : 'N/A'}</td>
+            <td>Rs ${row['Invoice Value'].toFixed(2)}</td>
+            <td>Rs ${row['Amount Pending'].toFixed(2)}</td>
+            <td>${row['STATUS'] || 'N/A'}</td>
+        `;
+        tableBody.appendChild(tr);
+    });
+
+    // Chart
+    if (chartInstance) chartInstance.destroy();
+    const daysSummary = {
+        '<60 Days': filteredData.filter(row => row['DAYS OF INVOICE'] < 60).reduce((sum, row) => sum + row['Amount Pending'], 0),
+        '60-90 Days': metrics.days60_90,
+        '90+ Days': metrics.days90Plus
+    };
+    chartInstance = new Chart(document.getElementById('days-chart'), {
+        type: 'bar',
+        data: {
+            labels: ['<60 Days', '60-90 Days', '90+ Days'],
+            datasets: [{
+                label: 'Outstanding Amount (Rs)',
+                data: [daysSummary['<60 Days'], daysSummary['60-90 Days'], daysSummary['90+ Days']],
+                backgroundColor: ['#36A2EB', '#FFCE56', '#8B0000']
+            }]
+        },
+        options: {
+            plugins: { title: { display: true, text: 'Outstanding by Days Category' } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+
+    // Show admin panel only for Eshak
+    if (loggedInRegion && loggedInRegion.toLowerCase() === 'eshak') {
+        document.getElementById('admin-panel').style.display = '';
+        showAdminPanel();
+    } else {
+        document.getElementById('admin-panel').style.display = 'none';
+    }
+}
+
+// ADMIN password update panel
+function showAdminPanel() {
+    const table = document.getElementById('password-table');
+    table.innerHTML = '';
+    const passwords = getRegionPasswords();
+    for (const region of regionList) {
+        const pwd = passwords[region.trim().toLowerCase()] || '12345678';
+        const row = document.createElement('tr');
+        row.innerHTML = `<td>${region}</td>
+            <td><input type="password" value="${pwd}" id="pwd_${region}" style="width:120px"></td>
+            <td><button onclick="updatePassword('${region}')">Update</button></td>`;
+        table.appendChild(row);
+    }
+}
+window.updatePassword = function(region) {
+    const newpwd = document.getElementById('pwd_' + region).value;
+    if (!newpwd) {
+        alert("Password cannot be blank.");
+        return;
+    }
+    const passwords = getRegionPasswords();
+    passwords[region.trim().toLowerCase()] = newpwd;
+    saveRegionPasswords(passwords);
+    alert("Password updated for " + region);
+};
+
+document.getElementById('login-form').addEventListener('submit', function(event) {
+    event.preventDefault();
+    const usernameInput = document.getElementById('username').value.trim();
+    const passwordInput = document.getElementById('password').value;
+    if(!usernameInput || !passwordInput) return;
+    const enteredRegion = regionList.find(
+        reg => reg.trim().toLowerCase() === usernameInput.toLowerCase()
+    );
+    if(!enteredRegion) {
+        document.getElementById('login-error').innerText = "Invalid region (Place) name.";
+        return;
+    }
+    ensureRegionRegistered(enteredRegion);
+    const pwdStore = getRegionPasswords();
+    if (pwdStore[enteredRegion.trim().toLowerCase()] !== passwordInput) {
+        document.getElementById('login-error').innerText = "Incorrect password.";
+        return;
+    }
+    // Success!
+    loggedInRegion = enteredRegion.trim();
+    document.getElementById('login-section').style.display = 'none';
+    document.getElementById('dashboard-section').style.display = '';
+    document.getElementById('login-error').innerText = '';
+    document.getElementById('username').value = '';
+    document.getElementById('password').value = '';
+    updateDashboard();
+    // Show/hide region search option
+    if(loggedInRegion.toLowerCase() === "eshak"){
+        document.getElementById('region-radio').style.display = '';
+        document.getElementById('region-label').style.display = '';
+    } else {
+        document.getElementById('region-radio').style.display = 'none';
+        document.getElementById('region-label').style.display = 'none';
+    }
+    // Always enable 'customer' search autocomplete for everyone
+    populateAutocomplete('Name of the Customer');
+});
+
+document.getElementById('logout-btn').addEventListener('click', function() {
+    loggedInRegion = null;
+    document.getElementById('dashboard-section').style.display = 'none';
+    document.getElementById('login-section').style.display = 'block';
+    // Reset search inputs and autocomplete
+    document.getElementById('search-input').value = '';
+    populateAutocomplete('Name of the Customer');
+});
+
+document.querySelectorAll('input[name="search-type"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        document.getElementById('search-input').value = '';
+        populateAutocomplete(radio.value);
+        updateDashboard();
+    });
+});
+document.getElementById('search-input').addEventListener('input', function() {
+    updateDashboard();
+});
+
+fetchData();
+setInterval(fetchData, 60000);
+
+</script>
 </body>
 </html>
