@@ -137,6 +137,12 @@
                 console.error('Fetch error:', error);
                 document.getElementById('error-message').style.display = 'block';
                 document.getElementById('error-message').innerText = 'Error loading data: ' + error.message;
+                if (data.length === 0) {
+                    data = [{ "Place": "eshak", "Invoice Value": 1000, "Amount Pending": 500, "Inv. Date": "01/01/2025" }];
+                    regionList = ["eshak"];
+                    ensureRegionRegistered("eshak");
+                    if (loggedInRegion) updateDashboard();
+                }
             }
         }
 
@@ -302,7 +308,6 @@
             document.getElementById('dashboard-section').style.display = '';
             document.getElementById('login-error').innerText = '';
             console.log('Login successful for:', loggedInRegion);
-            alert('Login successful! Loading dashboard...');
             updateDashboard();
         });
 
