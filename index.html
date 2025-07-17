@@ -14,15 +14,15 @@
         #autocomplete-list div:hover { background: #f0f0f0; }
         .card-container { display: flex; justify-content: space-around; flex-wrap: wrap; margin: 20px 0; }
         .card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 10px; width: 18%; min-width: 150px; text-align: center; }
+        .card[data-days="90+"] { background: #8B0000; color: #fff; }
         table { border-collapse: collapse; width: 80%; margin: 20px auto; background: white; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background: #f2f2f2; }
         #error-message { color: red; margin: 20px; display: none; }
-        #admin-panel { display: none; margin: 20px auto; background: #fcf9ed; padding: 15px; width: 80vw; max-width: 700px; border-radius: 8px; }
+        #admin-panel { display: none; margin: 20px auto; background: #fcf9ed; padding: 15px; width: 80vw; max-width: 700px; border-radius: 8px; text-align: left; }
         .update-block { margin: 10px 0; }
-        input[type="password"] { width: 150px; padding: 5px; }
+        select, input[type="password"] { width: 150px; padding: 5px; }
         button { padding: 5px 10px; margin-left: 10px; }
-        .password-row-updated { background: #c3ebc8; transition: background 0.6s; }
         @media (max-width: 768px) { .card { width: 45%; } #search-input, #autocomplete-list { width: 80%; } table { width: 95%; } }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -43,20 +43,13 @@
         <h1>Olive OS Invoice Dashboard</h1>
         <button id="logout-btn" style="float: right;">Logout</button>
         <div id="error-message"></div>
-        <div id="admin-panel">
-            <h3>Admin: Update Passwords for All Regions</h3>
-            <div class="update-block">
-                <p>Enter new passwords (eshak only):</p>
-                <table id="password-table">
-                    <thead><tr><th>Region</th><th>New Password</th><th>Action</th></tr></thead>
-                    <tbody id="password-tbody"></tbody>
-                </table>
-                <button onclick="updateAllPasswords()" style="margin-top: 10px;">Apply to All</button>
-                <div id="update-status" style="margin-top: 10px;"></div>
-            </div>
-        </div>
         <div class="search-container">
-            <input type="text" id="search-input" placeholder="Search by Customer..." autocomplete="off">
+            <label>Search By:</label>
+            <input type="radio" name="search-type" value="Name of the Customer" id="customer-radio" checked>
+            <label for="customer-radio">Customer</label>
+            <input type="radio" name="search-type" value="Place" id="region-radio">
+            <label for="region-radio">Region</label><br>
+            <input type="text" id="search-input" placeholder="Start typing to search..." autocomplete="off">
             <div id="autocomplete-list"></div>
         </div>
         <div class="card-container" id="kpi-cards"></div>
@@ -64,6 +57,20 @@
             <thead><tr><th>S.No.</th><th>Name of the Customer</th><th>Place</th><th>Inv. No.</th><th>Inv. Date</th><th>DAYS OF INVOICE</th><th>Invoice Value</th><th>Amount Pending</th><th>STATUS</th></tr></thead>
             <tbody id="table-body"></tbody>
         </table>
+        <div id="admin-panel">
+            <div class="update-block">
+                <label for="region-select">Select Region:</label>
+                <select id="region-select" style="margin-right: 10px;">
+                    <option value="">-- Select Region --</option>
+                </select>
+            </div>
+            <div class="update-block">
+                <label for="new-password">New Password:</label>
+                <input type="password" id="new-password" style="margin-right: 10px;">
+                <button onclick="updatePassword()">Submit</button>
+                <div id="update-status" style="margin-top: 10px;"></div>
+            </div>
+        </div>
     </div>
     <script>
         const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrtlUIgWw1mxcwNTm_e_YkfW_cr0tmPM4o0S2wHdLQ3Gv4NgfPOwp_kv1pTAIZ1Q/pub?output=csv";
@@ -125,6 +132,7 @@
                 regionList.forEach(ensureRegionRegistered);
                 if (loggedInRegion) updateDashboard();
                 populateAutocomplete();
+                populateRegionSelect();
             } catch (error) {
                 console.error('Fetch error:', error);
                 document.getElementById('error-message').style.display = 'block';
@@ -137,20 +145,23 @@
             const list = document.getElementById('autocomplete-list');
             list.innerHTML = '';
             let ds = data;
-            if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak') {
+            const searchType = document.querySelector('input[name="search-type"]:checked').value;
+            if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak' && searchType === 'Name of the Customer') {
+                ds = data.filter(row => row['Place'].toLowerCase() === loggedInRegion.toLowerCase());
+            } else if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak' && searchType === 'Place') {
                 ds = data.filter(row => row['Place'].toLowerCase() === loggedInRegion.toLowerCase());
             }
-            const uniqueCustomers = [...new Set(ds.map(row => row['Name of the Customer']))].filter(c => c && c.trim());
+            const uniqueValues = [...new Set(ds.map(row => row[searchType]))].filter(v => v && v.trim());
             input.oninput = function() {
                 const query = input.value.trim().toLowerCase();
                 list.innerHTML = '';
                 if (query) {
-                    const matches = uniqueCustomers.filter(c => c.toLowerCase().includes(query));
-                    matches.forEach(c => {
+                    const matches = uniqueValues.filter(v => v.toLowerCase().includes(query));
+                    matches.forEach(v => {
                         const div = document.createElement('div');
-                        div.innerText = c;
+                        div.innerText = v;
                         div.onclick = () => {
-                            input.value = c;
+                            input.value = v;
                             list.style.display = 'none';
                             updateDashboard();
                         };
@@ -163,17 +174,42 @@
             };
         }
 
+        function populateRegionSelect() {
+            const select = document.getElementById('region-select');
+            select.innerHTML = '<option value="">-- Select Region --</option>';
+            regionList.forEach(region => {
+                const option = document.createElement('option');
+                option.value = region;
+                option.textContent = region;
+                select.appendChild(option);
+            });
+        }
+
+        function computeMetrics(filteredData) {
+            const totalInvoiceValue = filteredData.reduce((sum, row) => sum + row['Invoice Value'], 0);
+            const totalOutstanding = filteredData.reduce((sum, row) => sum + row['Amount Pending'], 0);
+            const days60_90 = filteredData.filter(row => row['DAYS OF INVOICE'] >= 60 && row['DAYS OF INVOICE'] < 90).reduce((sum, row) => sum + row['Amount Pending'], 0);
+            const days90Plus = filteredData.filter(row => row['DAYS OF INVOICE'] >= 90).reduce((sum, row) => sum + row['Amount Pending'], 0);
+            return { totalInvoiceValue, totalOutstanding, days60_90, days90Plus };
+        }
+
         function updateDashboard() {
             let filteredData = data;
             if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak') {
                 filteredData = data.filter(row => row['Place'].toLowerCase() === loggedInRegion.toLowerCase());
             }
+            const searchType = document.querySelector('input[name="search-type"]:checked').value;
             const searchValue = document.getElementById('search-input').value.trim();
             if (searchValue) {
-                filteredData = filteredData.filter(row => row['Name of the Customer'] === searchValue);
+                filteredData = filteredData.filter(row => row[searchType] === searchValue);
             }
-            const totalValue = filteredData.reduce((sum, row) => sum + row['Invoice Value'], 0);
-            document.getElementById('kpi-cards').innerHTML = `<div class="card"><h3>Total Invoice Value</h3><p>Rs ${totalValue.toFixed(2)}</p></div>`;
+            const metrics = computeMetrics(filteredData);
+            document.getElementById('kpi-cards').innerHTML = `
+                <div class="card"><h3>Total Invoice Value</h3><p>Rs ${metrics.totalInvoiceValue.toFixed(2)}</p></div>
+                <div class="card"><h3>Total Outstanding</h3><p>Rs ${metrics.totalOutstanding.toFixed(2)}</p></div>
+                <div class="card"><h3>60-90 Days</h3><p>Rs ${metrics.days60_90.toFixed(2)}</p></div>
+                <div class="card" data-days="90+"><h3>90+ Days</h3><p>Rs ${metrics.days90Plus.toFixed(2)}</p></div>
+            `;
             const tableBody = document.getElementById('table-body');
             tableBody.innerHTML = '';
             filteredData.slice(0, 10).forEach((row, i) => {
@@ -193,75 +229,30 @@
             });
             if (loggedInRegion && loggedInRegion.toLowerCase() === 'eshak') {
                 document.getElementById('admin-panel').style.display = 'block';
-                showAdminPanel();
             } else {
                 document.getElementById('admin-panel').style.display = 'none';
             }
         }
 
-        function showAdminPanel() {
-            const tbody = document.getElementById('password-tbody');
-            tbody.innerHTML = '';
-            const passwords = getRegionPasswords();
-            regionList.forEach(region => {
-                const key = region.trim().toLowerCase();
-                const inputId = `pwd_${key.replace(/[^a-z0-9]/gi, '_')}`;
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${region}</td>
-                    <td><input type="password" id="${inputId}" value="${passwords[key] || '12345678'}"></td>
-                    <td><button onclick="updatePassword('${region}', '${inputId}', this)">Update</button></td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        function updatePassword(region, inputId, btn) {
+        function updatePassword() {
             if (loggedInRegion.toLowerCase() !== 'eshak') {
                 document.getElementById('update-status').innerText = 'Only eshak can update passwords.';
                 document.getElementById('update-status').style.color = 'red';
                 return;
             }
-            const newPassword = document.getElementById(inputId).value.trim();
-            if (!newPassword) {
-                document.getElementById('update-status').innerText = 'Password cannot be blank.';
+            const region = document.getElementById('region-select').value;
+            const newPassword = document.getElementById('new-password').value.trim();
+            if (!region || !newPassword) {
+                document.getElementById('update-status').innerText = 'Please select a region and enter a password.';
                 document.getElementById('update-status').style.color = 'red';
                 return;
             }
             let passwords = getRegionPasswords();
             passwords[region.toLowerCase()] = newPassword;
             saveRegionPasswords(passwords);
-            btn.closest('tr').classList.add('password-row-updated');
-            setTimeout(() => btn.closest('tr').classList.remove('password-row-updated'), 1000);
-            document.getElementById('update-status').innerText = `Updated ${region}.`;
+            document.getElementById('update-status').innerText = `Password updated for ${region}.`;
             document.getElementById('update-status').style.color = 'green';
-        }
-
-        function updateAllPasswords() {
-            if (loggedInRegion.toLowerCase() !== 'eshak') {
-                document.getElementById('update-status').innerText = 'Only eshak can update passwords.';
-                document.getElementById('update-status').style.color = 'red';
-                return;
-            }
-            const inputs = document.querySelectorAll('#password-tbody input[type="password"]');
-            let passwords = getRegionPasswords();
-            let allValid = true;
-            inputs.forEach(input => {
-                const region = input.closest('tr').querySelector('td:first-child').innerText;
-                const newPassword = input.value.trim();
-                if (!newPassword) allValid = false;
-                passwords[region.toLowerCase()] = newPassword;
-            });
-            if (!allValid) {
-                document.getElementById('update-status').innerText = 'All passwords must be filled.';
-                document.getElementById('update-status').style.color = 'red';
-                return;
-            }
-            saveRegionPasswords(passwords);
-            document.querySelectorAll('#password-tbody tr').forEach(tr => tr.classList.add('password-row-updated'));
-            setTimeout(() => document.querySelectorAll('#password-tbody tr').forEach(tr => tr.classList.remove('password-row-updated')), 1000);
-            document.getElementById('update-status').innerText = 'All passwords updated.';
-            document.getElementById('update-status').style.color = 'green';
+            document.getElementById('new-password').value = '';
         }
 
         document.getElementById('login-form').addEventListener('submit', function(e) {
@@ -289,6 +280,14 @@
             loggedInRegion = null;
             document.getElementById('dashboard-section').style.display = 'none';
             document.getElementById('login-section').style.display = 'block';
+        });
+
+        document.querySelectorAll('input[name="search-type"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                document.getElementById('search-input').value = '';
+                populateAutocomplete();
+                updateDashboard();
+            });
         });
 
         document.getElementById('search-input').addEventListener('input', updateDashboard);
