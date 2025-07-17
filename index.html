@@ -32,7 +32,7 @@
             #search-input, #autocomplete-list { width: 80%;}
             table, canvas { width: 95%;}
         }
-        #admin-panel { display:none; margin:20px auto; background: #fcf9ed; text-align:left; width:80vw; max-width:700px; border-radius:8px; box-shadow:0 0 8px #eee; padding:18px 25px;}
+        #admin-panel { display:none; margin:16px auto 30px auto; background: #fcf9ed; text-align:left; width:80vw; max-width:700px; border-radius:8px; box-shadow:0 0 8px #eee; padding:18px 25px;}
         #admin-panel table { width:100%;}
         #admin-panel input[type="password"], #admin-panel input[type="text"] { width:110px;}
         #admin-panel button { min-width:60px;}
@@ -58,7 +58,7 @@
             <button id="logout-btn" style="display:inline-block;">Logout</button>
         </div>
         <div id="error-message"></div>
-        <div id="admin-panel">
+        <div id="admin-panel" style="display:none;">
             <h3>Admin: Change Region Passwords</h3>
             <table>
                 <thead><tr><th>Region (Place)</th><th>Password</th><th>Action</th></tr></thead>
@@ -96,16 +96,15 @@
     </div>
 <script>
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrtlUIgWw1mxcwNTm_e_YkfW_cr0tmPM4o0S2wHdLQ3Gv4NgfPOwp_kv1pTAIZ1Q/pub?output=csv";
-const getSheetURL = () => SHEET_URL + "&t=" + Date.now();    // Force fresh fetch every time
+const getSheetURL = () => SHEET_URL + "&t=" + Date.now();
 let data = [];
 let chartInstance = null;
 let regionList = [];
 let loggedInRegion = null;
 
 function getRegionPasswords() {
-    try {
-        return JSON.parse(localStorage.getItem('region_passwords') || '{}');
-    } catch { return {};}
+    try { return JSON.parse(localStorage.getItem('region_passwords') || '{}'); }
+    catch { return {}; }
 }
 function saveRegionPasswords(passwords) {
     localStorage.setItem('region_passwords', JSON.stringify(passwords));
@@ -118,7 +117,7 @@ function ensureRegionRegistered(region) {
     }
 }
 
-// Main fetch (always gets fresh Sheet)
+// Always fetch fresh Sheet
 async function fetchData() {
     try {
         const response = await fetch(getSheetURL());
@@ -142,11 +141,20 @@ async function fetchData() {
                     normalizedHeader === 'status' ? 'STATUS' : 
                     normalizedHeader] = value;
             });
-            // Parse invoice date (prefer dd/mm/yyyy, yyyy-mm-dd)
-            const idate = new Date(obj['Inv. Date']);
+            // Parse invoice date (supports dd/mm/yyyy, yyyy-mm-dd)
+            let idate = NaN;
+            if (obj['Inv. Date']) {
+                if (obj['Inv. Date'].match(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/)) {
+                    // dd/mm/yyyy
+                    const [d, m, y] = obj['Inv. Date'].split("/");
+                    idate = new Date(+y, +m-1, +d);
+                } else {
+                    idate = new Date(obj['Inv. Date']);
+                }
+            }
             obj['Invoice Value'] = parseFloat((obj['Invoice Value']||'').replace(/[₹Rs$,]/gi, '').replace(/,/g, '').replace(/\s/g, '') || 0);
             obj['Amount Pending'] = parseFloat((obj['Amount Pending']||'').replace(/[₹Rs$,]/gi, '').replace(/,/g, '').replace(/\s/g, '') || 0);
-            // "Days of Invoice": always calculate dynamically
+            // Always calculate Days of Invoice
             if (!isNaN(idate)) {
                 const now = new Date();
                 obj['DAYS OF INVOICE'] = Math.floor((now.getTime() - idate.getTime()) / (1000*60*60*24));
@@ -157,6 +165,7 @@ async function fetchData() {
         });
         regionList = [...new Set(data.map(row => row['Place']).map(x => x && x.trim()).filter(val => !!val && val !== 'N/A'))];
         regionList.forEach(ensureRegionRegistered);
+
         if (loggedInRegion) {
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('dashboard-section').style.display = '';
@@ -175,11 +184,11 @@ function populateAutocomplete(searchType) {
     const list = document.getElementById('autocomplete-list');
     list.innerHTML = '';
     let ds = data;
-    if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak' && searchType === 'Name of the Customer') {
-        ds = data.filter(row => row['Place'] && row['Place'].trim().toLowerCase() === loggedInRegion.toLowerCase());
+    if (loggedInRegion && loggedInRegion.trim().toLowerCase() !== 'eshak' && searchType === 'Name of the Customer') {
+        ds = data.filter(row => row['Place'] && row['Place'].trim().toLowerCase() === loggedInRegion.trim().toLowerCase());
     }
-    else if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak' && searchType === 'Place') {
-        ds = data.filter(row => row['Place'] && row['Place'].trim().toLowerCase() === loggedInRegion.toLowerCase());
+    else if (loggedInRegion && loggedInRegion.trim().toLowerCase() !== 'eshak' && searchType === 'Place') {
+        ds = data.filter(row => row['Place'] && row['Place'].trim().toLowerCase() === loggedInRegion.trim().toLowerCase());
     }
     const uniqueValues = [...new Set(ds.map(row => row[searchType]))]
         .filter(val => val && val.trim() !== '')
@@ -219,12 +228,13 @@ function computeMetrics(filteredData) {
 }
 
 function updateDashboard() {
-    if (!data || !data.length) return;
+    // DEBUGGING: See login state in DevTools
+    //console.log('[DEBUG updateDashboard] loggedInRegion=', loggedInRegion);
     let searchType = document.querySelector('input[name="search-type"]:checked')?.value || 'Name of the Customer';
     let searchValue = document.getElementById('search-input').value.trim();
     let filteredData;
-    if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak') {
-        filteredData = data.filter(row => (row['Place']||'').trim().toLowerCase() === loggedInRegion.toLowerCase());
+    if (loggedInRegion && loggedInRegion.trim().toLowerCase() !== 'eshak') {
+        filteredData = data.filter(row => (row['Place']||'').trim().toLowerCase() === loggedInRegion.trim().toLowerCase());
         document.getElementById('region-radio').style.display = 'none';
         document.getElementById('region-label').style.display = 'none';
     } else {
@@ -281,65 +291,63 @@ function updateDashboard() {
             scales: { y: { beginAtZero: true } }
         }
     });
-    if (loggedInRegion && loggedInRegion.toLowerCase() === 'eshak') {
+    // ###### PROVEN ROBUST ADMIN BLOCK LOGIC ######
+    if (
+        typeof loggedInRegion === 'string'
+        && loggedInRegion.trim().toLowerCase() === 'eshak'
+    ) {
+        //console.log('[DEBUG] Enabling admin panel!');
         document.getElementById('admin-panel').style.display = '';
         showAdminPanel();
     } else {
         document.getElementById('admin-panel').style.display = 'none';
     }
 }
+
 function showAdminPanel() {
     const table = document.getElementById('password-table');
     table.innerHTML = '';
     const passwords = getRegionPasswords();
     for (const region of regionList) {
-        const pwd = passwords[region.trim().toLowerCase()] || '12345678';
-        const safeId = 'pwd_' + btoa(encodeURIComponent(region)).replace(/=+$/g,'');
+        const key = region.trim().toLowerCase();
+        const pwd = passwords[key] || '12345678';
+        const inputId = 'pwd_' + btoa(encodeURIComponent(region));
         const row = document.createElement('tr');
         row.innerHTML = `<td>${region}</td>
-            <td>
-                <input type="password" id="${safeId}" value="${pwd}">
-                <button onclick="toggleShow('${safeId}', this)" title="Show/hide password" style="margin-left:3px;">👁️</button>
+            <td><input type="password" id="${inputId}" value="${pwd}">
+                <button onclick="toggleShow('${inputId}', this)">👁️</button>
             </td>
             <td>
-                <button onclick="updatePassword('${region}', '${safeId}', this)">Update</button>
+                <button onclick="updatePassword('${region}', '${inputId}', this)">Update</button>
             </td>`;
         table.appendChild(row);
     }
 }
-window.toggleShow = function(fieldId, btn) {
-    const input = document.getElementById(fieldId);
-    if (!input) return;
+window.toggleShow = function(id, btn) {
+    const input = document.getElementById(id);
     if (input.type === "password") {
-        input.type = "text";
-        btn.innerText = "🙈";
-    } else {
-        input.type = "password";
-        btn.innerText = "👁️";
-    }
+        input.type = "text"; btn.innerText = "🙈";
+    } else { input.type = "password"; btn.innerText = "👁️"; }
 };
-window.updatePassword = function(region, fieldId, btn) {
-    const newpwd = document.getElementById(fieldId).value;
+window.updatePassword = function(region, inputId, btn) {
+    const newpwd = document.getElementById(inputId).value;
     if (!newpwd) {
-        alert("Password cannot be blank.");
-        return;
+        alert("Password cannot be blank."); return;
     }
     const passwords = getRegionPasswords();
     passwords[region.trim().toLowerCase()] = newpwd;
     saveRegionPasswords(passwords);
-    const row = btn.closest("tr");
-    row.classList.add("password-row-updated");
-    setTimeout(() => row.classList.remove("password-row-updated"), 1300);
+    btn.closest('tr').style.background = "#c3ebc8";
+    setTimeout(() => btn.closest('tr').style.background = "", 1300);
     alert("Password updated for " + region);
-};
+}
 
 document.getElementById('login-form').addEventListener('submit', function(event) {
     event.preventDefault();
     const usernameInput = document.getElementById('username').value.trim();
     const passwordInput = document.getElementById('password').value;
-    if(!usernameInput || !passwordInput) return;
     const enteredRegion = regionList.find(
-        reg => reg.trim().toLowerCase() === usernameInput.toLowerCase()
+        reg => reg && reg.trim().toLowerCase() === usernameInput.toLowerCase()
     );
     if(!enteredRegion) {
         document.getElementById('login-error').innerText = "Invalid region (Place) name.";
@@ -358,7 +366,7 @@ document.getElementById('login-form').addEventListener('submit', function(event)
     document.getElementById('username').value = '';
     document.getElementById('password').value = '';
     updateDashboard();
-    if(loggedInRegion.toLowerCase() === "eshak") {
+    if(loggedInRegion.trim().toLowerCase() === "eshak") {
         document.getElementById('region-radio').style.display = '';
         document.getElementById('region-label').style.display = '';
     } else {
