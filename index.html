@@ -7,160 +7,57 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f4f4f9;
-            text-align: center;
+            margin:0; padding:20px; background:#f4f4f9; text-align:center;
         }
-        h1 {
-            color: #333;
+        h1 { color: #333; }
+        .search-container { margin: 20px 0; position: relative;}
+        .search-container label { font-size: 18px; margin-right: 10px; }
+        .search-container input[type="radio"] { margin:0 5px; }
+        #search-input { width:50%; padding:10px; font-size:16px; border:1px solid #ddd; border-radius:5px;}
+        #autocomplete-list { position:absolute; width:50%; max-height:200px; overflow-y:auto; background:#fff; border:1px solid #ddd; border-radius:5px; z-index:1000; display:none; }
+        #autocomplete-list div { padding:10px; cursor:pointer;}
+        #autocomplete-list div:hover { background:#f0f0f0;}
+        .card-container { display: flex; justify-content:space-around; flex-wrap:wrap; margin:20px 0; }
+        .card { background:#fff; border:1px solid #ddd; border-radius:8px; box-shadow:2px 2px 5px rgba(0,0,0,0.1); padding:20px; margin:10px; width:18%; min-width:150px; text-align:center; word-wrap:break-word;}
+        .card h3 { margin-bottom:10px; font-size:18px;}
+        .card p { margin:0; font-size:24px; font-weight:bold; }
+        .card[data-days="90+"] { background: #8B0000; color: #fff;}
+        table { border-collapse: collapse; width: 80%; margin: 20px auto; background-color: white;}
+        th, td { border:1px solid #ddd; padding:10px; text-align:left;}
+        th { background: #f2f2f2;}
+        canvas { max-width:80%; margin:20px auto;}
+        #error-message { color:red; margin:20px; display:none;}
+        @media (max-width:768px) {
+            .card { width:45%;}
+            #search-input, #autocomplete-list { width: 80%;}
+            table, canvas { width: 95%;}
         }
-        .search-container {
-            margin: 20px 0;
-            position: relative;
-        }
-        .search-container label {
-            font-size: 18px;
-            margin-right: 10px;
-        }
-        .search-container input[type="radio"] {
-            margin: 0 5px;
-        }
-        #search-input {
-            width: 50%;
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        #autocomplete-list {
-            position: absolute;
-            width: 50%;
-            max-height: 200px;
-            overflow-y: auto;
-            background-color: white;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            z-index: 1000;
-            display: none;
-        }
-        #autocomplete-list div {
-            padding: 10px;
-            cursor: pointer;
-        }
-        #autocomplete-list div:hover {
-            background-color: #f0f0f0;
-        }
-        .card-container {
-            display: flex;
-            justify-content: space-around;
-            flex-wrap: wrap;
-            margin: 20px 0;
-        }
-        .card {
-            background-color: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
-            padding: 20px;
-            margin: 10px;
-            width: 18%;
-            min-width: 150px;
-            text-align: center;
-            word-wrap: break-word;
-        }
-        .card h3 {
-            margin: 0 0 10px;
-            font-size: 18px;
-        }
-        .card p {
-            margin: 0;
-            font-size: 24px;
-            font-weight: bold;
-            overflow: hidden;
-        }
-        .card[data-days="90+"] {
-            background-color: #8B0000;
-            color: white;
-        }
-        table {
-            border-collapse: collapse;
-            width: 80%;
-            margin: 20px auto;
-            background-color: white;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 10px;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        canvas {
-            max-width: 80%;
-            margin: 20px auto;
-        }
-        #error-message {
-            color: red;
-            margin: 20px;
-            display: none;
-        }
-        @media (max-width: 768px) {
-            .card { width: 45%; }
-            #search-input, #autocomplete-list { width: 80%; }
-            table, canvas { width: 95%; }
-        }
-        #admin-panel {
-            display: none;
-            margin: 20px auto;
-            background: #fcf9ed;
-            text-align: left;
-            width: 80vw;
-            max-width: 700px;
-            border-radius: 8px;
-            box-shadow: 0 0 8px #eee;
-            padding: 18px 25px;
-        }
-        #admin-panel table {
-            width: 100%;
-        }
-        #admin-panel input[type="password"], #admin-panel input[type="text"] {
-            width: 110px;
-        }
-        #admin-panel button {
-            min-width: 60px;
-        }
-        .password-row-updated {
-            background: #c3ebc8 !important;
-            transition: background 0.6s;
-        }
+        #admin-panel { display:none; margin:20px auto; background: #fcf9ed; text-align:left; width:80vw; max-width:700px; border-radius:8px; box-shadow:0 0 8px #eee; padding:18px 25px;}
+        #admin-panel table { width:100%;}
+        #admin-panel input[type="password"], #admin-panel input[type="text"] { width:110px;}
+        #admin-panel button { min-width:60px;}
+        .password-row-updated { background: #c3ebc8!important; transition: background 0.6s;}
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <!-- LOGIN SECTION -->
-    <div id="login-section" style="display: block;">
+    <div id="login-section" style="display:block;">
         <h2>Login to Olive OS Invoice Dashboard</h2>
-        <form id="login-form" autocomplete="on" style="display: inline-block; margin: auto; text-align: left;">
+        <form id="login-form" autocomplete="on" style="display:inline-block; margin:auto; text-align:left;">
             <label for="username">Region Name (Place):</label><br>
-            <input type="text" id="username" name="username" autocomplete="username" required style="width: 250px;"><br>
+            <input type="text" id="username" name="username" autocomplete="username" required style="width:250px;"><br>
             <label for="password">Password:</label><br>
-            <input type="password" id="password" name="password" autocomplete="current-password" required style="width: 250px;"><br>
-            <button type="submit" style="width: 250px; margin-top: 10px;">Login</button>
-            <div id="login-error" style="color: red; margin-top: 10px;"></div>
+            <input type="password" id="password" name="password" autocomplete="current-password" required style="width:250px;"><br>
+            <button type="submit" style="width:250px; margin-top:10px;">Login</button>
+            <div id="login-error" style="color:red; margin-top:10px;"></div>
         </form>
     </div>
-
-    <!-- DASHBOARD SECTION (hidden before login) -->
-    <div id="dashboard-section" style="display: none;">
+    <div id="dashboard-section" style="display:none;">
         <h1>Olive OS Invoice Dashboard</h1>
-        <div style="text-align: right; margin-bottom: 10px;">
+        <div style="text-align:right; margin-bottom:10px;">
             <button id="logout-btn" style="display:inline-block;">Logout</button>
         </div>
         <div id="error-message"></div>
-
-        <!-- ADMIN PANEL (Eshak only) -->
         <div id="admin-panel">
             <h3>Admin: Change Region Passwords</h3>
             <table>
@@ -168,8 +65,6 @@
                 <tbody id="password-table"></tbody>
             </table>
         </div>
-
-        <!-- SEARCH CONTAINER: Always show customer search for all roles -->
         <div class="search-container" id="search-container">
             <label>Search By:</label>
             <input type="radio" name="search-type" value="Name of the Customer" id="customer-radio" checked>
@@ -180,7 +75,6 @@
             <input type="text" id="search-input" autocomplete="off" placeholder="Start typing to search...">
             <div id="autocomplete-list"></div>
         </div>
-
         <div class="card-container" id="kpi-cards"></div>
         <canvas id="days-chart"></canvas>
         <table id="data-table">
@@ -201,7 +95,8 @@
         </table>
     </div>
 <script>
-const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrtlUIgWw1mxcwNTm_e_YkfW_cr0tmPM4o0S2wHdLQ3Gv4NgfPOwp_kv1pTAIZ1Q/pub?output=csv";
+const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrtlUIgWw1mxcwNTm_e_YkfW_cr0tmPM4o0S2wHdLQ3Gv4NgfPOwp_kv1pTAIZ1Q/pub?output=csv";
+const getSheetURL = () => SHEET_URL + "&t=" + Date.now();    // Force fresh fetch every time
 let data = [];
 let chartInstance = null;
 let regionList = [];
@@ -209,10 +104,8 @@ let loggedInRegion = null;
 
 function getRegionPasswords() {
     try {
-        const out = JSON.parse(localStorage.getItem('region_passwords') || '{}');
-        if (typeof out === 'object' && out !== null) return out;
-    } catch (e) {}
-    return {};
+        return JSON.parse(localStorage.getItem('region_passwords') || '{}');
+    } catch { return {};}
 }
 function saveRegionPasswords(passwords) {
     localStorage.setItem('region_passwords', JSON.stringify(passwords));
@@ -225,9 +118,10 @@ function ensureRegionRegistered(region) {
     }
 }
 
+// Main fetch (always gets fresh Sheet)
 async function fetchData() {
     try {
-        const response = await fetch(url);
+        const response = await fetch(getSheetURL());
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const text = await response.text();
         const rows = text.split('\n').map(row => row.split(',').map(cell => cell.trim()));
@@ -248,14 +142,21 @@ async function fetchData() {
                     normalizedHeader === 'status' ? 'STATUS' : 
                     normalizedHeader] = value;
             });
-            obj['DAYS OF INVOICE'] = parseFloat((obj['DAYS OF INVOICE'] || '').replace(/[^0-9.-]+/g, '') || 0);
-            obj['Invoice Value'] = parseFloat((obj['Invoice Value'] || '').replace(/[₹Rs$,]/gi, '').replace(/,/g, '').replace(/\s/g, '') || 0);
-            obj['Amount Pending'] = parseFloat((obj['Amount Pending'] || '').replace(/[₹Rs$,]/gi, '').replace(/,/g, '').replace(/\s/g, '') || 0);
+            // Parse invoice date (prefer dd/mm/yyyy, yyyy-mm-dd)
+            const idate = new Date(obj['Inv. Date']);
+            obj['Invoice Value'] = parseFloat((obj['Invoice Value']||'').replace(/[₹Rs$,]/gi, '').replace(/,/g, '').replace(/\s/g, '') || 0);
+            obj['Amount Pending'] = parseFloat((obj['Amount Pending']||'').replace(/[₹Rs$,]/gi, '').replace(/,/g, '').replace(/\s/g, '') || 0);
+            // "Days of Invoice": always calculate dynamically
+            if (!isNaN(idate)) {
+                const now = new Date();
+                obj['DAYS OF INVOICE'] = Math.floor((now.getTime() - idate.getTime()) / (1000*60*60*24));
+            } else {
+                obj['DAYS OF INVOICE'] = 0;
+            }
             return obj;
         });
-        regionList = [...new Set(data.map(row => row['Place']).map(x=>x && x.trim()).filter(val => !!val && val !== 'N/A'))];
+        regionList = [...new Set(data.map(row => row['Place']).map(x => x && x.trim()).filter(val => !!val && val !== 'N/A'))];
         regionList.forEach(ensureRegionRegistered);
-
         if (loggedInRegion) {
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('dashboard-section').style.display = '';
@@ -276,7 +177,8 @@ function populateAutocomplete(searchType) {
     let ds = data;
     if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak' && searchType === 'Name of the Customer') {
         ds = data.filter(row => row['Place'] && row['Place'].trim().toLowerCase() === loggedInRegion.toLowerCase());
-    } else if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak' && searchType === 'Place') {
+    }
+    else if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak' && searchType === 'Place') {
         ds = data.filter(row => row['Place'] && row['Place'].trim().toLowerCase() === loggedInRegion.toLowerCase());
     }
     const uniqueValues = [...new Set(ds.map(row => row[searchType]))]
@@ -308,12 +210,8 @@ function populateAutocomplete(searchType) {
 function computeMetrics(filteredData) {
     const totalInvoiceValue = filteredData.reduce((sum, row) => sum + row['Invoice Value'], 0);
     const totalOutstanding = filteredData.reduce((sum, row) => sum + row['Amount Pending'], 0);
-    const days60_90 = filteredData
-        .filter(row => row['DAYS OF INVOICE'] >= 60 && row['DAYS OF INVOICE'] < 90)
-        .reduce((sum, row) => sum + row['Amount Pending'], 0);
-    const days90Plus = filteredData
-        .filter(row => row['DAYS OF INVOICE'] >= 90)
-        .reduce((sum, row) => sum + row['Amount Pending'], 0);
+    const days60_90 = filteredData.filter(row => row['DAYS OF INVOICE'] >= 60 && row['DAYS OF INVOICE'] < 90).reduce((sum, row) => sum + row['Amount Pending'], 0);
+    const days90Plus = filteredData.filter(row => row['DAYS OF INVOICE'] >= 90).reduce((sum, row) => sum + row['Amount Pending'], 0);
     const totalReceivables = data.reduce((sum, row) => sum + row['Amount Pending'], 0);
     const totalCreditSales = data.reduce((sum, row) => sum + row['Invoice Value'], 0);
     const dso = totalCreditSales > 0 ? (totalReceivables / totalCreditSales) * 365 : 0;
@@ -325,7 +223,6 @@ function updateDashboard() {
     let searchType = document.querySelector('input[name="search-type"]:checked')?.value || 'Name of the Customer';
     let searchValue = document.getElementById('search-input').value.trim();
     let filteredData;
-
     if (loggedInRegion && loggedInRegion.toLowerCase() !== 'eshak') {
         filteredData = data.filter(row => (row['Place']||'').trim().toLowerCase() === loggedInRegion.toLowerCase());
         document.getElementById('region-radio').style.display = 'none';
@@ -339,7 +236,6 @@ function updateDashboard() {
         filteredData = filteredData.filter(row => (row[searchType]||'') === searchValue);
     }
     const metrics = computeMetrics(filteredData);
-
     document.getElementById('kpi-cards').innerHTML = `
         <div class="card"><h3>Total Invoice Value</h3><p>Rs ${metrics.totalInvoiceValue.toFixed(2)}</p></div>
         <div class="card"><h3>Total Outstanding</h3><p>Rs ${metrics.totalOutstanding.toFixed(2)}</p></div>
@@ -364,7 +260,6 @@ function updateDashboard() {
         `;
         tableBody.appendChild(tr);
     });
-
     if (chartInstance) chartInstance.destroy();
     const daysSummary = {
         '<60 Days': filteredData.filter(row => row['DAYS OF INVOICE'] < 60).reduce((sum, row) => sum + row['Amount Pending'], 0),
@@ -386,7 +281,6 @@ function updateDashboard() {
             scales: { y: { beginAtZero: true } }
         }
     });
-
     if (loggedInRegion && loggedInRegion.toLowerCase() === 'eshak') {
         document.getElementById('admin-panel').style.display = '';
         showAdminPanel();
@@ -394,7 +288,6 @@ function updateDashboard() {
         document.getElementById('admin-panel').style.display = 'none';
     }
 }
-
 function showAdminPanel() {
     const table = document.getElementById('password-table');
     table.innerHTML = '';
@@ -434,7 +327,6 @@ window.updatePassword = function(region, fieldId, btn) {
     const passwords = getRegionPasswords();
     passwords[region.trim().toLowerCase()] = newpwd;
     saveRegionPasswords(passwords);
-    // Visual feedback:
     const row = btn.closest("tr");
     row.classList.add("password-row-updated");
     setTimeout(() => row.classList.remove("password-row-updated"), 1300);
